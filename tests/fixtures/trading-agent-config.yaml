@@ -1,0 +1,11 @@
+agent_id: trading-price-action
+mode: accumulate
+model: gemini
+analysis_mode: full_video
+sources:
+  youtube_channels:
+    - handle: "@TestChannel"
+      check_schedule: "0 8 * * *"
+consolidation_schedule: "0 3 * * 0"
+decay:
+  half_life_days: 365
