@@ -19,14 +19,19 @@ def main():
     if not gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY environment variable not set.")
 
+    AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+
     agents = []
     for agent_dir in sorted(AGENTS_DIR.iterdir()):
         if not agent_dir.is_dir():
             continue
         if not (agent_dir / "config.yaml").exists():
             continue
-        logger.info(f"Loading agent: {agent_dir.name}")
-        agents.append(load_agent(agent_dir, gemini_api_key=gemini_api_key))
+        try:
+            logger.info(f"Loading agent: {agent_dir.name}")
+            agents.append(load_agent(agent_dir, gemini_api_key=gemini_api_key))
+        except Exception as e:
+            logger.error(f"Failed to load agent {agent_dir.name}: {e}")
 
     if not agents:
         logger.warning(

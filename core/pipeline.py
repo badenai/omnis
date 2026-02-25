@@ -47,4 +47,6 @@ class CollectionPipeline:
             except Exception as e:
                 logger.error(f"Failed to process {vid_id}: {e}")
 
+        from datetime import datetime, timezone
+        state.update_last_checked(channel_handle, datetime.now(timezone.utc).isoformat())
         state.save()

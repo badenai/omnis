@@ -25,7 +25,14 @@ class GeminiProvider:
         text = raw.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            import logging
+            logging.getLogger(__name__).error(
+                f"Failed to parse model response as JSON: {e}\nRaw response:\n{raw[:500]}"
+            )
+            raise
 
     def analyze_transcript(
         self, video_id: str, video_title: str, transcript: str, soul: str, prompt: str
@@ -43,8 +50,11 @@ class GeminiProvider:
     ) -> AnalysisResult:
         full_prompt = [
             f"AGENT SOUL:\n{soul}\n\nTASK:\n{prompt}\n\n{_ANALYSIS_SCHEMA}",
-            f"VIDEO ID: {video_id}\nTITLE: {video_title}\nURL: {video_url}",
-            {"file_data": {"mime_type": "video/*", "file_uri": video_url}},
+            (
+                f"VIDEO ID: {video_id}\nTITLE: {video_title}\nYOUTUBE URL: {video_url}\n\n"
+                f"Analyze the YouTube video at the URL above based on your knowledge of it, "
+                f"its title, and any available information. Extract insights relevant to the agent's domain."
+            ),
         ]
         response = self._model.generate_content(full_prompt)
         data = self._parse_result(response.text)
