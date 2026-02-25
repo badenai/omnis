@@ -32,8 +32,8 @@ def test_consolidation_generates_briefing_when_inbox_has_items(tmp_path, mocker)
     mock_provider.generate_briefing.return_value = "# Briefing\nContent."
     mock_provider.generate_skill.return_value = "---\nname: test\n---\n# Skill"
 
-    # Patch SkillWriter to avoid touching the real ~/.claude dir
-    with patch("core.consolidation.SkillWriter") as MockSW:
+    with patch("core.consolidation.SkillWriter") as MockSW, \
+         patch("core.consolidation.Registry"):
         MockSW.return_value.write.return_value = tmp_path / "SKILL.md"
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
@@ -53,7 +53,8 @@ def test_consolidation_clears_inbox_after_run(tmp_path, mocker):
     mock_provider.generate_briefing.return_value = "# Briefing"
     mock_provider.generate_skill.return_value = "# Skill"
 
-    with patch("core.consolidation.SkillWriter"):
+    with patch("core.consolidation.SkillWriter"), \
+         patch("core.consolidation.Registry"):
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 

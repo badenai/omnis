@@ -2,6 +2,7 @@ import pathlib
 import logging
 from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
+from core.registry import Registry
 from core.skill_writer import SkillWriter
 from core.state import AgentState
 from core.models.types import AgentConfig
@@ -52,8 +53,6 @@ class ConsolidationPipeline:
         sw = SkillWriter(self._dir)
         sw.write(skill_content, self._config.agent_id)
 
-        from core.registry import Registry
-        import pathlib
         reg = Registry(pathlib.Path.home() / ".cloracle" / "registry.json")
         reg.register(
             self._config.agent_id,
