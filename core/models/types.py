@@ -13,9 +13,17 @@ class AnalysisResult:
 
 
 @dataclass
+class ConsolidationDecision:
+    inbox_index: int
+    action: str   # "update_concept" | "new_concept" | "new_recent"
+    target: str   # filename hint (no extension)
+
+
+@dataclass
 class ConsolidationResult:
     updated_files: list[str]
     created_files: list[str]
+    decisions: list = field(default_factory=list)   # list[ConsolidationDecision]
     errors: list[str] = field(default_factory=list)
 
 

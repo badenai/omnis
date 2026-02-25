@@ -27,9 +27,20 @@ class ConsolidationPipeline:
         index_path = self._dir / "knowledge" / "_index.md"
         existing_index = index_path.read_text(encoding="utf-8") if index_path.exists() else ""
 
-        self._provider.consolidate(items, existing_index, self._soul)
+        result = self._provider.consolidate(items, existing_index, self._soul)
 
         kw = KnowledgeWriter(self._dir, self._config.decay.get("half_life_days", 365))
+        for decision in result.decisions:
+            if decision.inbox_index >= len(items):
+                continue
+            content = items[decision.inbox_index]
+            if decision.action == "update_concept":
+                kw.update_concept(decision.target, content, source_id="inbox")
+            elif decision.action == "new_concept":
+                kw.write_concept(decision.target, content)
+            elif decision.action == "new_recent":
+                kw.write_recent(decision.target, content, source_id="inbox")
+
         knowledge_files = kw.load_all_weighted()
 
         briefing = self._provider.generate_briefing(knowledge_files, self._soul, self._config.mode)
@@ -40,6 +51,16 @@ class ConsolidationPipeline:
         )
         sw = SkillWriter(self._dir)
         sw.write(skill_content, self._config.agent_id)
+
+        from core.registry import Registry
+        import pathlib
+        reg = Registry(pathlib.Path.home() / ".cloracle" / "registry.json")
+        reg.register(
+            self._config.agent_id,
+            self._dir / "SKILL.md",
+            self._config.mode,
+        )
+        reg.save()
 
         self._update_index(knowledge_files)
         inbox.clear()

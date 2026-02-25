@@ -112,11 +112,15 @@ Respond with JSON only:
         data = json.loads(text)
         updated = []
         created = []
+        decisions = []
         for decision in data.get("decisions", []):
             action = decision.get("action", "")
             target = decision.get("target", "")
+            idx = decision.get("inbox_index", 0)
             if action == "update_concept":
                 updated.append(target)
             elif action in ("new_concept", "new_recent"):
                 created.append(target)
-        return ConsolidationResult(updated_files=updated, created_files=created, errors=[])
+            from core.models.types import ConsolidationDecision
+            decisions.append(ConsolidationDecision(inbox_index=idx, action=action, target=target))
+        return ConsolidationResult(updated_files=updated, created_files=created, decisions=decisions, errors=[])
