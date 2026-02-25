@@ -1,8 +1,11 @@
 import os
 import pathlib
 import logging
+from dotenv import load_dotenv
 from core.agent_loader import load_agent
 from core.scheduler import build_scheduler
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
