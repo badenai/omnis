@@ -110,4 +110,13 @@ Respond with JSON only:
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0]
         data = json.loads(text)
-        return ConsolidationResult(updated_files=[], created_files=[], errors=[])
+        updated = []
+        created = []
+        for decision in data.get("decisions", []):
+            action = decision.get("action", "")
+            target = decision.get("target", "")
+            if action == "update_concept":
+                updated.append(target)
+            elif action in ("new_concept", "new_recent"):
+                created.append(target)
+        return ConsolidationResult(updated_files=updated, created_files=created, errors=[])
