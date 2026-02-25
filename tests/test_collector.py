@@ -22,10 +22,10 @@ def test_get_new_videos_filters_processed(mocker):
 
 
 def test_fetch_transcript_returns_text(mocker):
-    mock_transcript = mocker.patch("core.collector.YouTubeTranscriptApi.get_transcript")
-    mock_transcript.return_value = [
-        {"text": "Hello world"},
-        {"text": "Second sentence"},
+    mock_fetch = mocker.patch("core.collector._fetch_segments")
+    mock_fetch.return_value = [
+        {"text": "Hello world", "start": 0.0, "duration": 1.0},
+        {"text": "Second sentence", "start": 1.0, "duration": 1.0},
     ]
     result = fetch_transcript("video-id")
     assert "Hello world" in result

@@ -71,9 +71,9 @@ class KnowledgeWriter:
             if f.name == "_index.md":
                 continue
             post = frontmatter.load(str(f))
-            created_str = post.get("created", date.today().isoformat())
+            created_str = post.get("created", datetime.now(timezone.utc).date().isoformat())
             created = date.fromisoformat(str(created_str))
-            age = (date.today() - created).days
+            age = (datetime.now(timezone.utc).date() - created).days
             score = float(post.get("relevance_score", 1.0))
             weight = self.compute_effective_weight(score, age)
             files.append({
