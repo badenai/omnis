@@ -1,5 +1,24 @@
-[build-system]
-requires = ["setuptools"]
+[project]
+name = "cloracle"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "APScheduler>=3.10.4",
+    "python-dotenv>=1.0.0",
+    "yt-dlp>=2024.1.1",
+    "youtube-transcript-api>=0.6.2",
+    "google-genai>=1.0.0",
+    "openai>=1.40.0",
+    "anthropic>=0.34.0",
+    "python-frontmatter>=1.1.0",
+    "PyYAML>=6.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
