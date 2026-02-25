@@ -43,9 +43,13 @@ def main():
         )
         return
 
-    logger.info(f"Loaded {len(agents)} agent(s). Starting scheduler.")
+    logger.info(f"Loaded {len(agents)} agent(s). Starting scheduler. Press Ctrl+C to stop.")
     scheduler = build_scheduler(agents)
-    scheduler.start()
+    try:
+        scheduler.start()
+    except KeyboardInterrupt:
+        logger.info("Shutting down cloracle. Goodbye.")
+        scheduler.shutdown(wait=False)
 
 
 if __name__ == "__main__":
