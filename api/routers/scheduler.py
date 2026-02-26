@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 
 from core.scheduler_instance import get_scheduler
+from core import job_status
 from api.schemas import JobInfo
 
 logger = logging.getLogger(__name__)
@@ -61,3 +62,32 @@ def trigger_consolidation(agent_id: str, request: Request):
     )
     logger.info(f"Triggered consolidation: {agent_id}")
     return {"status": "triggered", "agent_id": agent_id}
+
+
+@router.post("/trigger/{agent_id}/reevaluate")
+def trigger_reevaluation(agent_id: str, request: Request):
+    agents = request.app.state.agents
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+
+    agent = agents[agent_id]
+    pipeline = agent["consolidation"]
+    scheduler = get_scheduler()
+
+    scheduler.add_job(
+        pipeline.run_reevaluation,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        id=f"{agent_id}_manual_reevaluate_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Manual reevaluate {agent_id}",
+    )
+    logger.info(f"Triggered reevaluation: {agent_id}")
+    return {"status": "triggered", "agent_id": agent_id}
+
+
+@router.get("/activity")
+def get_activity():
+    return {
+        "active": job_status.get_active(),
+        "history": job_status.get_history(),
+    }
