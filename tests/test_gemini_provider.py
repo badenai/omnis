@@ -68,3 +68,5 @@ def test_reevaluate_knowledge_returns_score_dict(mocker):
 
     assert result == {"concepts/topic.md": 0.7}
     mock_client.models.generate_content.assert_called_once()
+    call_kwargs = mock_client.models.generate_content.call_args.kwargs
+    assert call_kwargs["model"] == provider._consolidation_model_name
