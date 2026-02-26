@@ -62,6 +62,14 @@ class KnowledgeWriter:
         dest.write_text(frontmatter.dumps(post), encoding="utf-8")
         return dest
 
+    def update_relevance_score(self, relative_path: str, score: float) -> None:
+        dest = self._base / relative_path
+        if not dest.exists():
+            return
+        post = frontmatter.load(str(dest))
+        post["relevance_score"] = score
+        dest.write_text(frontmatter.dumps(post), encoding="utf-8")
+
     def load_all_weighted(self) -> list[dict]:
         """Load all knowledge files sorted by effective_weight descending."""
         files = []

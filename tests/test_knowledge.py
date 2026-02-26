@@ -36,3 +36,16 @@ def test_load_all_weighted_sorted(tmp_path):
     assert len(files) == 2
     weights = [f["effective_weight"] for f in files]
     assert weights == sorted(weights, reverse=True)
+
+
+def test_update_relevance_score_patches_frontmatter(tmp_path):
+    import frontmatter as fm
+    kw = KnowledgeWriter(tmp_path, half_life_days=365)
+    # Write a concept file first
+    kw.write_concept("my-topic", "Original content about trading.")
+    # Now re-score it
+    kw.update_relevance_score("concepts/my-topic.md", 0.42)
+    # Reload and check
+    post = fm.load(str(tmp_path / "knowledge" / "concepts" / "my-topic.md"))
+    assert post["relevance_score"] == 0.42
+    assert post.content == "Original content about trading."  # content unchanged
