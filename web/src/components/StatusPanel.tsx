@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTriggerCollection, useTriggerConsolidation } from '../api/scheduler';
+import { useTriggerCollection, useTriggerConsolidation, useTriggerReevaluation } from '../api/scheduler';
 import { useJobs } from '../api/scheduler';
 import type { AgentDetail } from '../types';
 
@@ -11,6 +11,7 @@ export default function StatusPanel({ agent }: Props) {
   const { data: jobs } = useJobs();
   const triggerCollection = useTriggerCollection(agent.agent_id);
   const triggerConsolidation = useTriggerConsolidation(agent.agent_id);
+  const triggerReevaluation = useTriggerReevaluation(agent.agent_id);
   const [message, setMessage] = useState('');
 
   const agentJobs = jobs?.filter((j) => j.id.startsWith(agent.agent_id)) ?? [];
@@ -31,6 +32,16 @@ export default function StatusPanel({ agent }: Props) {
     try {
       await triggerConsolidation.mutateAsync();
       setMessage('Triggered consolidation');
+    } catch (err) {
+      setMessage(`Error: ${(err as Error).message}`);
+    }
+  };
+
+  const handleReevaluate = async () => {
+    setMessage('');
+    try {
+      await triggerReevaluation.mutateAsync();
+      setMessage('Triggered reevaluation');
     } catch (err) {
       setMessage(`Error: ${(err as Error).message}`);
     }
@@ -91,13 +102,20 @@ export default function StatusPanel({ agent }: Props) {
         </div>
       </div>
 
-      <div>
+      <div className="flex gap-3">
         <button
           onClick={handleConsolidate}
           disabled={triggerConsolidation.isPending}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded text-sm font-medium transition-colors"
         >
           {triggerConsolidation.isPending ? 'Triggering...' : 'Run Consolidation Now'}
+        </button>
+        <button
+          onClick={handleReevaluate}
+          disabled={triggerReevaluation.isPending}
+          className="px-4 py-2 bg-violet-700 hover:bg-violet-600 disabled:opacity-50 rounded text-sm font-medium transition-colors"
+        >
+          {triggerReevaluation.isPending ? 'Triggering...' : 'Reevaluate Now'}
         </button>
       </div>
 
