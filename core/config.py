@@ -22,3 +22,15 @@ def load_soul(agent_dir: pathlib.Path) -> str:
     if soul_file.exists():
         return soul_file.read_text(encoding="utf-8")
     return ""
+
+
+def save_agent_config(config_path: pathlib.Path, config: dict) -> None:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+
+def save_soul(agent_dir: pathlib.Path, text: str) -> None:
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    soul_file = agent_dir / "SOUL.md"
+    soul_file.write_text(text, encoding="utf-8")

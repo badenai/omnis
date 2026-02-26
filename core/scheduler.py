@@ -1,13 +1,14 @@
 import pathlib
 import logging
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
 
-def build_scheduler(agents: list[dict]) -> BlockingScheduler:
-    scheduler = BlockingScheduler()
+def build_scheduler(agents: list[dict], scheduler: BackgroundScheduler | None = None) -> BackgroundScheduler:
+    if scheduler is None:
+        scheduler = BackgroundScheduler()
 
     for agent in agents:
         config = agent["config"]

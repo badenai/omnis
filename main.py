@@ -1,9 +1,11 @@
 import os
+import signal
 import pathlib
 import logging
 from dotenv import load_dotenv
 from core.agent_loader import load_agent
 from core.scheduler import build_scheduler
+from core.scheduler_instance import set_scheduler
 
 load_dotenv()
 
@@ -45,9 +47,21 @@ def main():
 
     logger.info(f"Loaded {len(agents)} agent(s). Starting scheduler. Press Ctrl+C to stop.")
     scheduler = build_scheduler(agents)
+    set_scheduler(scheduler)
+    scheduler.start()
+
     try:
-        scheduler.start()
+        signal.pause()
+    except AttributeError:
+        # signal.pause() not available on Windows; block with input instead
+        try:
+            import threading
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            pass
     except KeyboardInterrupt:
+        pass
+    finally:
         logger.info("Shutting down cloracle. Goodbye.")
         scheduler.shutdown(wait=False)
 
