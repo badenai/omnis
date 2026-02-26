@@ -18,15 +18,26 @@ Respond with valid JSON only, no markdown fences:
 }
 """
 
+_REEVALUATE_SCHEMA = """
+Respond with valid JSON only, no markdown fences:
+{"scores": [{"path": "<relative_path>", "score": <0.0-1.0>}, ...]}
+"""
+
 
 class GeminiProvider:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "gemini-3-flash-preview",
+        consolidation_model_name: str = "gemini-3.1-pro-preview",
+    ):
         self._client = genai.Client(api_key=api_key)
         self._model_name = model_name
+        self._consolidation_model_name = consolidation_model_name
 
-    def _generate(self, contents: str | list) -> str:
+    def _generate(self, contents: str | list, model: str | None = None) -> str:
         response = self._client.models.generate_content(
-            model=self._model_name,
+            model=model or self._model_name,
             contents=contents,
         )
         return response.text
@@ -77,7 +88,7 @@ class GeminiProvider:
             f"- For 'watch': Recent Developments -> Trends -> Opportunity Suggestions\n\n"
             f"KNOWLEDGE FILES:\n{files_text}"
         )
-        return self._generate(contents)
+        return self._generate(contents, model=self._consolidation_model_name)
 
     def generate_skill(self, briefing: str, soul: str, agent_id: str) -> str:
         contents = (
@@ -88,7 +99,7 @@ class GeminiProvider:
             f"ready to be used as context for an implementation agent.\n\n"
             f"BRIEFING:\n{briefing}"
         )
-        return self._generate(contents)
+        return self._generate(contents, model=self._consolidation_model_name)
 
     def consolidate(
         self, inbox_items: list[str], existing_index: str, soul: str
@@ -105,7 +116,7 @@ class GeminiProvider:
             f"Respond with JSON only:\n"
             f'{{"decisions": [{{"inbox_index": 0, "action": "update_concept", "target": "support-resistance"}}, ...]}}'
         )
-        raw = self._generate(contents)
+        raw = self._generate(contents, model=self._consolidation_model_name)
         text = raw.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0]
@@ -121,3 +132,17 @@ class GeminiProvider:
                 created.append(target)
             decisions.append(ConsolidationDecision(inbox_index=idx, action=action, target=target))
         return ConsolidationResult(updated_files=updated, created_files=created, decisions=decisions)
+
+    def reevaluate_knowledge(self, files: list[dict], soul: str) -> dict[str, float]:
+        files_text = "\n\n".join(
+            f"--- {f['path']} ---\n{f['content']}" for f in files
+        )
+        contents = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"TASK: Re-score each knowledge file below. Assign a relevance_score from 0.0 "
+            f"(completely irrelevant to the soul's interests) to 1.0 (directly core to them).\n\n"
+            f"{_REEVALUATE_SCHEMA}\n\n"
+            f"KNOWLEDGE FILES:\n{files_text}"
+        )
+        data = self._parse_result(self._generate(contents, model=self._consolidation_model_name))
+        return {item["path"]: float(item["score"]) for item in data.get("scores", [])}

@@ -54,3 +54,17 @@ def test_analyze_video_uses_url(mocker):
     call = mock_client.models.generate_content.call_args
     contents = call.kwargs.get("contents", "")
     assert "youtube.com" in str(contents)
+
+
+def test_reevaluate_knowledge_returns_score_dict(mocker):
+    mock_client = _make_mock_client(
+        '{"scores": [{"path": "concepts/topic.md", "score": 0.7}]}'
+    )
+    mocker.patch("core.models.gemini.genai.Client", return_value=mock_client)
+
+    provider = GeminiProvider(api_key="fake-key")
+    files = [{"path": "concepts/topic.md", "content": "Some knowledge content."}]
+    result = provider.reevaluate_knowledge(files, SOUL)
+
+    assert result == {"concepts/topic.md": 0.7}
+    mock_client.models.generate_content.assert_called_once()
