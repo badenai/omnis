@@ -49,3 +49,9 @@ def test_update_relevance_score_patches_frontmatter(tmp_path):
     post = fm.load(str(tmp_path / "knowledge" / "concepts" / "my-topic.md"))
     assert post["relevance_score"] == 0.42
     assert post.content == "Original content about trading."  # content unchanged
+
+
+def test_update_relevance_score_missing_file_is_noop(tmp_path):
+    kw = KnowledgeWriter(tmp_path, half_life_days=365)
+    # Should not raise any exception
+    kw.update_relevance_score("concepts/nonexistent.md", 0.5)
