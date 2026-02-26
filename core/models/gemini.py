@@ -134,6 +134,8 @@ class GeminiProvider:
         return ConsolidationResult(updated_files=updated, created_files=created, decisions=decisions)
 
     def reevaluate_knowledge(self, files: list[dict], soul: str) -> dict[str, float]:
+        if not files:
+            return {}
         files_text = "\n\n".join(
             f"--- {f['path']} ---\n{f['content']}" for f in files
         )
