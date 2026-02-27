@@ -88,8 +88,8 @@ if (-not $NoFrontend) {
     $FrontendLog   = Join-Path $Root ".frontend.log"
     $FrontendLogErr = Join-Path $Root ".frontend.err.log"
 
-    $FrontendProc = Start-Process -FilePath "npm" `
-        -ArgumentList "run", "dev" `
+    $FrontendProc = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c", "npm", "run", "dev" `
         -WorkingDirectory $WebDir `
         -RedirectStandardOutput $FrontendLog `
         -RedirectStandardError $FrontendLogErr `
