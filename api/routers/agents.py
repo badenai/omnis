@@ -68,7 +68,10 @@ def _agent_detail(agent: dict) -> AgentDetail:
         sources=config.sources,
         consolidation_schedule=config.consolidation_schedule,
         decay=config.decay,
+        collection_model=config.collection_model,
+        consolidation_model=config.consolidation_model,
         soul=agent["soul"],
+        research=config.research,
         last_checked=state.last_checked,
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
@@ -127,6 +130,9 @@ def create_agent(body: AgentConfigCreate, request: Request):
         },
         "consolidation_schedule": body.consolidation_schedule,
         "decay": body.decay.model_dump(),
+        "collection_model": body.collection_model,
+        "consolidation_model": body.consolidation_model,
+        "research": body.research.model_dump(),
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
     save_soul(agent_dir, body.soul)
@@ -169,6 +175,9 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
             body.consolidation_schedule if body.consolidation_schedule is not None else config.consolidation_schedule
         ),
         "decay": body.decay.model_dump() if body.decay is not None else config.decay,
+        "collection_model": body.collection_model if body.collection_model is not None else config.collection_model,
+        "consolidation_model": body.consolidation_model if body.consolidation_model is not None else config.consolidation_model,
+        "research": body.research.model_dump() if body.research is not None else config.research,
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
 
@@ -198,6 +207,18 @@ def update_soul(agent_id: str, body: SoulUpdate, request: Request):
     _reschedule_agent(new_agent)
     logger.info(f"Updated soul for agent: {agent_id}")
     return _agent_detail(new_agent)
+
+
+@router.get("/{agent_id}/discovered-sources")
+def get_discovered_sources(agent_id: str, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent_dir = agents[agent_id]["dir"]
+    discovered_path = agent_dir / "discovered_sources.md"
+    if not discovered_path.exists():
+        return {"content": ""}
+    return {"content": discovered_path.read_text(encoding="utf-8")}
 
 
 @router.delete("/{agent_id}", status_code=204)

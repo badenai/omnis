@@ -11,6 +11,11 @@ export interface AgentDecay {
   half_life_days: number;
 }
 
+export interface AgentResearch {
+  enabled: boolean;
+  schedule: string;
+}
+
 export interface AgentSummary {
   agent_id: string;
   mode: string;
@@ -31,7 +36,10 @@ export interface AgentDetail {
   sources: { youtube_channels?: ChannelSource[] };
   consolidation_schedule: string;
   decay: { half_life_days: number };
+  collection_model: string;
+  consolidation_model: string;
   soul: string;
+  research?: AgentResearch;
   last_checked: Record<string, string>;
   last_consolidation: string | null;
   inbox_count: number;
@@ -46,7 +54,10 @@ export interface AgentConfigCreate {
   sources: AgentSources;
   consolidation_schedule: string;
   decay: AgentDecay;
+  collection_model: string;
+  consolidation_model: string;
   soul: string;
+  research?: AgentResearch;
 }
 
 export interface AgentConfigUpdate {
@@ -56,6 +67,9 @@ export interface AgentConfigUpdate {
   sources?: AgentSources;
   consolidation_schedule?: string;
   decay?: AgentDecay;
+  collection_model?: string;
+  consolidation_model?: string;
+  research?: AgentResearch;
 }
 
 export interface JobInfo {

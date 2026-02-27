@@ -79,6 +79,7 @@ class ConsolidationPipeline:
             state.update_last_consolidation()
             state.save()
             logger.info("Consolidation complete.")
+            self._call_thesis_validation_safely()
             job_status.complete(agent_id, task)
 
         except Exception as e:
@@ -133,6 +134,60 @@ class ConsolidationPipeline:
             logger.error(f"Reevaluation failed: {e}")
             job_status.fail(agent_id, task, str(e))
             raise
+
+    def run_thesis_validation(self) -> None:
+        """Search for counter-evidence against current knowledge. Appends results to briefing.md."""
+        agent_id = self._config.agent_id
+        task = "thesis-validation"
+        job_status.start(agent_id, task, "Loading knowledge for thesis validation...")
+
+        try:
+            kw = KnowledgeWriter(self._dir, self._config.decay.get("half_life_days", 365))
+            files = kw.load_all_weighted()
+            if not files:
+                job_status.complete(agent_id, task)
+                return
+
+            top_files = files[:15]
+            job_status.update_step(agent_id, task, f"Searching for counter-evidence on {len(top_files)} files...")
+            result = self._provider.validate_thesis(top_files, self._soul)
+
+            briefing_path = self._dir / "briefing.md"
+            existing = briefing_path.read_text(encoding="utf-8") if briefing_path.exists() else ""
+            briefing_path.write_text(existing + "\n\n" + self._format_validation_section(result), encoding="utf-8")
+
+            logger.info(f"[{agent_id}] Thesis validation: {len(result.flagged_files)} flag(s)")
+            job_status.complete(agent_id, task)
+
+        except Exception as e:
+            logger.error(f"[{agent_id}] Thesis validation failed: {e}")
+            job_status.fail(agent_id, task, str(e))
+            raise
+
+    def _format_validation_section(self, result) -> str:
+        from datetime import datetime, timezone
+        lines = [
+            "---",
+            f"## Thesis Validation — {datetime.now(timezone.utc).date().isoformat()}",
+            "",
+            result.validation_summary,
+            "",
+        ]
+        if result.flagged_files:
+            lines.append("### Flagged for Review")
+            for flag in result.flagged_files:
+                sev = flag.get("severity", "low").upper()
+                lines.append(f"- [{sev}] `{flag['path']}` — {flag['concern']}")
+        return "\n".join(lines)
+
+    def _call_thesis_validation_safely(self) -> None:
+        """Run thesis validation only if research is enabled; swallow errors so consolidation succeeds."""
+        if not self._config.research.get("enabled", False):
+            return
+        try:
+            self.run_thesis_validation()
+        except Exception:
+            logger.warning(f"[{self._config.agent_id}] Thesis validation failed; consolidation continues.")
 
     def _update_index(self, files: list[dict]) -> None:
         lines = ["# Knowledge Index\n"]

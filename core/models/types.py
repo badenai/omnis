@@ -28,6 +28,33 @@ class ConsolidationResult:
 
 
 @dataclass
+class ResearchFinding:
+    title: str
+    insights: list[str]
+    relevance_score: float
+    suggested_action: str        # "update_concept" | "new_concept" | "new_recent"
+    suggested_target: str        # kebab-case filename hint
+    raw_summary: str
+    sources_consulted: list[str]
+
+
+@dataclass
+class DiscoveredSource:
+    url: str
+    source_type: str             # "youtube_channel" | "blog" | "website" | "podcast"
+    handle: str | None
+    rationale: str
+    discovered_at: str           # ISO timestamp
+
+
+@dataclass
+class ThesisValidationResult:
+    flagged_files: list[dict]    # Each: {"path": str, "concern": str, "severity": str}
+    validation_summary: str
+    searched_at: str
+
+
+@dataclass
 class AgentConfig:
     agent_id: str
     mode: str                      # "accumulate" | "watch"
@@ -36,3 +63,7 @@ class AgentConfig:
     sources: dict
     consolidation_schedule: str
     decay: dict
+    collection_model: str = "gemini-3-flash-preview"
+    consolidation_model: str = "gemini-3.1-pro-preview"
+    research: dict = field(default_factory=dict)
+    # Shape: {"enabled": bool, "schedule": "cron string"}

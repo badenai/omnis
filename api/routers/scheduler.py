@@ -85,6 +85,27 @@ def trigger_reevaluation(agent_id: str, request: Request):
     return {"status": "triggered", "agent_id": agent_id}
 
 
+@router.post("/trigger/{agent_id}/research")
+def trigger_research(agent_id: str, request: Request):
+    agents = request.app.state.agents
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent = agents[agent_id]
+    if "research" not in agent:
+        raise HTTPException(400, f"Agent '{agent_id}' has no research session")
+    session = agent["research"]
+    scheduler = get_scheduler()
+    scheduler.add_job(
+        session.run,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        id=f"{agent_id}_manual_research_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Manual research {agent_id}",
+    )
+    logger.info(f"Triggered research session: {agent_id}")
+    return {"status": "triggered", "agent_id": agent_id}
+
+
 @router.get("/activity")
 def get_activity():
     return {

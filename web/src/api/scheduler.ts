@@ -55,3 +55,20 @@ export function useTriggerReevaluation(agentId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
 }
+
+export function useTriggerResearch(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/scheduler/trigger/${agentId}/research`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
+export function useDiscoveredSources(agentId: string) {
+  return useQuery({
+    queryKey: ['discovered-sources', agentId],
+    queryFn: () => apiFetch<{ content: string }>(`/agents/${agentId}/discovered-sources`),
+    refetchInterval: false,
+  });
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateAgent, useUpdateConfig } from '../api/agents';
-import type { AgentDetail, ChannelSource } from '../types';
+import type { AgentDetail, ChannelSource, AgentResearch } from '../types';
 import ChannelList from './ChannelList';
 import CronInput from './CronInput';
 
@@ -19,6 +19,8 @@ export default function AgentForm({ agent }: Props) {
   const [mode, setMode] = useState(agent?.mode ?? 'accumulate');
   const [model, setModel] = useState(agent?.model ?? 'gemini');
   const [analysisMode, setAnalysisMode] = useState(agent?.analysis_mode ?? 'transcript_only');
+  const [collectionModel, setCollectionModel] = useState(agent?.collection_model ?? 'gemini-3-flash-preview');
+  const [consolidationModel, setConsolidationModel] = useState(agent?.consolidation_model ?? 'gemini-3.1-pro-preview');
   const [channels, setChannels] = useState<ChannelSource[]>(
     agent?.sources.youtube_channels ?? []
   );
@@ -26,6 +28,8 @@ export default function AgentForm({ agent }: Props) {
     agent?.consolidation_schedule ?? '0 3 * * 0'
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
+  const [researchEnabled, setResearchEnabled] = useState(agent?.research?.enabled ?? false);
+  const [researchSchedule, setResearchSchedule] = useState(agent?.research?.schedule ?? '0 10 * * *');
   const [soul, setSoul] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -36,6 +40,7 @@ export default function AgentForm({ agent }: Props) {
     setMessage('');
 
     try {
+      const research: AgentResearch = { enabled: researchEnabled, schedule: researchSchedule };
       if (isEdit) {
         await updateConfig.mutateAsync({
           mode,
@@ -44,6 +49,9 @@ export default function AgentForm({ agent }: Props) {
           sources: { youtube_channels: channels },
           consolidation_schedule: consolidationSchedule,
           decay: { half_life_days: halfLife },
+          collection_model: collectionModel,
+          consolidation_model: consolidationModel,
+          research,
         });
         setMessage('Config saved.');
       } else {
@@ -55,7 +63,10 @@ export default function AgentForm({ agent }: Props) {
           sources: { youtube_channels: channels },
           consolidation_schedule: consolidationSchedule,
           decay: { half_life_days: halfLife },
+          collection_model: collectionModel,
+          consolidation_model: consolidationModel,
           soul,
+          research,
         });
         navigate(`/agents/${agentId}`);
       }
@@ -120,6 +131,27 @@ export default function AgentForm({ agent }: Props) {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-400 mb-1">Collection Model</label>
+          <input
+            type="text"
+            value={collectionModel}
+            onChange={(e) => setCollectionModel(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-400 mb-1">Consolidation Model</label>
+          <input
+            type="text"
+            value={consolidationModel}
+            onChange={(e) => setConsolidationModel(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1">YouTube Channels</label>
         <ChannelList channels={channels} onChange={setChannels} />
@@ -142,6 +174,27 @@ export default function AgentForm({ agent }: Props) {
           onChange={(e) => setHalfLife(Number(e.target.value))}
           className="w-full"
         />
+      </div>
+
+      <div className="border border-gray-800 rounded-lg p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="research-enabled"
+            checked={researchEnabled}
+            onChange={(e) => setResearchEnabled(e.target.checked)}
+            className="w-4 h-4 accent-indigo-500"
+          />
+          <label htmlFor="research-enabled" className="text-sm font-medium text-gray-300">
+            Autonomous Research — Let the AI search the web guided by its soul
+          </label>
+        </div>
+        {researchEnabled && (
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Research Schedule</label>
+            <CronInput value={researchSchedule} onChange={setResearchSchedule} />
+          </div>
+        )}
       </div>
 
       {!isEdit && (

@@ -14,6 +14,11 @@ class AgentDecay(BaseModel):
     half_life_days: int = 365
 
 
+class AgentResearch(BaseModel):
+    enabled: bool = False
+    schedule: str = "0 10 * * *"
+
+
 class AgentConfigCreate(BaseModel):
     agent_id: str
     mode: str = "accumulate"
@@ -22,7 +27,10 @@ class AgentConfigCreate(BaseModel):
     sources: AgentSources = AgentSources()
     consolidation_schedule: str = "0 3 * * 0"
     decay: AgentDecay = AgentDecay()
+    collection_model: str = "gemini-3-flash-preview"
+    consolidation_model: str = "gemini-3.1-pro-preview"
     soul: str = ""
+    research: AgentResearch = AgentResearch()
 
 
 class AgentConfigUpdate(BaseModel):
@@ -32,6 +40,9 @@ class AgentConfigUpdate(BaseModel):
     sources: AgentSources | None = None
     consolidation_schedule: str | None = None
     decay: AgentDecay | None = None
+    collection_model: str | None = None
+    consolidation_model: str | None = None
+    research: AgentResearch | None = None
 
 
 class SoulUpdate(BaseModel):
@@ -58,7 +69,10 @@ class AgentDetail(BaseModel):
     sources: dict
     consolidation_schedule: str
     decay: dict
+    collection_model: str
+    consolidation_model: str
     soul: str
+    research: dict = {}
     last_checked: dict = {}
     last_consolidation: str | None = None
     inbox_count: int = 0

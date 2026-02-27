@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { useTriggerCollection, useTriggerConsolidation, useTriggerReevaluation } from '../api/scheduler';
+import {
+  useTriggerCollection, useTriggerConsolidation, useTriggerReevaluation,
+  useTriggerResearch, useDiscoveredSources,
+} from '../api/scheduler';
 import { useJobs } from '../api/scheduler';
 import type { AgentDetail } from '../types';
 
@@ -12,6 +15,8 @@ export default function StatusPanel({ agent }: Props) {
   const triggerCollection = useTriggerCollection(agent.agent_id);
   const triggerConsolidation = useTriggerConsolidation(agent.agent_id);
   const triggerReevaluation = useTriggerReevaluation(agent.agent_id);
+  const triggerResearch = useTriggerResearch(agent.agent_id);
+  const { data: discoveredSources } = useDiscoveredSources(agent.agent_id);
   const [message, setMessage] = useState('');
 
   const agentJobs = jobs?.filter((j) => j.id.startsWith(agent.agent_id)) ?? [];
@@ -42,6 +47,16 @@ export default function StatusPanel({ agent }: Props) {
     try {
       await triggerReevaluation.mutateAsync();
       setMessage('Triggered reevaluation');
+    } catch (err) {
+      setMessage(`Error: ${(err as Error).message}`);
+    }
+  };
+
+  const handleResearch = async () => {
+    setMessage('');
+    try {
+      await triggerResearch.mutateAsync();
+      setMessage('Triggered research session');
     } catch (err) {
       setMessage(`Error: ${(err as Error).message}`);
     }
@@ -102,7 +117,7 @@ export default function StatusPanel({ agent }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <button
           onClick={handleConsolidate}
           disabled={triggerConsolidation.isPending}
@@ -117,7 +132,25 @@ export default function StatusPanel({ agent }: Props) {
         >
           {triggerReevaluation.isPending ? 'Triggering...' : 'Reevaluate Now'}
         </button>
+        {agent.research?.enabled && (
+          <button
+            onClick={handleResearch}
+            disabled={triggerResearch.isPending}
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded text-sm font-medium transition-colors"
+          >
+            {triggerResearch.isPending ? 'Triggering...' : 'Research Now'}
+          </button>
+        )}
       </div>
+
+      {discoveredSources?.content && (
+        <div>
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Discovered Sources</h3>
+          <pre className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-64">
+            {discoveredSources.content}
+          </pre>
+        </div>
+      )}
 
       {agentJobs.length > 0 && (
         <div>

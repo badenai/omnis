@@ -22,3 +22,37 @@ def test_load_soul(tmp_path):
 def test_load_soul_missing_returns_empty(tmp_path):
     soul = load_soul(tmp_path)
     assert soul == ""
+
+
+def test_load_config_reads_research_block(tmp_path):
+    yaml_content = """\
+agent_id: test-agent
+mode: accumulate
+model: gemini
+analysis_mode: transcript_only
+sources: {}
+consolidation_schedule: "0 3 * * 0"
+decay:
+  half_life_days: 365
+research:
+  enabled: true
+  schedule: "0 10 * * *"
+"""
+    (tmp_path / "config.yaml").write_text(yaml_content)
+    config = load_agent_config(tmp_path / "config.yaml")
+    assert config.research == {"enabled": True, "schedule": "0 10 * * *"}
+
+
+def test_load_config_defaults_research_to_empty(tmp_path):
+    yaml_content = """\
+agent_id: test-agent
+mode: accumulate
+model: gemini
+analysis_mode: transcript_only
+sources: {}
+consolidation_schedule: "0 3 * * 0"
+decay: {}
+"""
+    (tmp_path / "config.yaml").write_text(yaml_content)
+    config = load_agent_config(tmp_path / "config.yaml")
+    assert config.research == {}

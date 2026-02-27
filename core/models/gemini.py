@@ -1,7 +1,10 @@
 import json
 import logging
 from google import genai
-from core.models.types import AnalysisResult, ConsolidationResult, ConsolidationDecision
+from core.models.types import (
+    AnalysisResult, ConsolidationResult, ConsolidationDecision,
+    ResearchFinding, DiscoveredSource, ThesisValidationResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,72 @@ Respond with valid JSON only, no markdown fences:
 _REEVALUATE_SCHEMA = """
 Respond with valid JSON only, no markdown fences:
 {"scores": [{"path": "<relative_path>", "score": <0.0-1.0>}, ...]}
+"""
+
+
+_RESEARCH_PROMPT_TEMPLATE = """\
+AGENT SOUL:
+{soul}
+
+EXISTING KNOWLEDGE INDEX (extend or challenge — do not repeat verbatim):
+{knowledge_index}
+
+KNOWN SOURCES ALREADY MONITORED:
+{existing_sources}
+
+TASK: You are an autonomous researcher. Using Google Search, conduct a focused research \
+session on the topics defined in your soul. Goals:
+1. Find new insights, recent developments, counter-evidence, or updates to existing knowledge
+2. Identify up to 5 genuinely new sources worth monitoring regularly (only if found)
+
+After your research, output ONLY the delimited blocks below. No other text.
+Cap findings at 10 blocks maximum.
+
+For each insight cluster:
+---FINDING_START---
+TITLE: <short label>
+ACTION: <update_concept|new_concept|new_recent>
+TARGET: <kebab-case-filename-hint>
+RELEVANCE: <0.0-1.0>
+SOURCES:
+- <url consulted>
+INSIGHTS:
+- <bullet point insight>
+SUMMARY:
+<narrative paragraph>
+---FINDING_END---
+
+For each new source worth monitoring:
+---SOURCE_START---
+URL: <full url>
+TYPE: <youtube_channel|blog|website|podcast>
+HANDLE: <@handle or NONE>
+RATIONALE: <one sentence>
+---SOURCE_END---
+"""
+
+_VALIDATION_PROMPT_TEMPLATE = """\
+AGENT SOUL:
+{soul}
+
+TOP KNOWLEDGE FILES (most relevant first):
+{files_text}
+
+TASK: You are a critical researcher. Use Google Search to find:
+1. Recent evidence that contradicts or significantly updates any of the above
+2. Deprecated information (outdated practices, defunct tools, changed circumstances)
+3. Important recent developments the knowledge base is missing
+
+For each concern:
+---FLAG_START---
+PATH: <relative/path/to/file.md>
+SEVERITY: <low|medium|high>
+CONCERN: <one sentence describing what changed or contradicts this>
+---FLAG_END---
+
+After all flags, write:
+VALIDATION_SUMMARY:
+<narrative paragraph summarizing the overall health of the knowledge base>
 """
 
 
@@ -148,3 +217,199 @@ class GeminiProvider:
         )
         data = self._parse_result(self._generate(contents, model=self._consolidation_model_name))
         return {item["path"]: float(item["score"]) for item in data.get("scores", [])}
+
+    # -------------------------------------------------------------------------
+    # Search-enabled generation (google_search tool)
+    # NOTE: JSON response mode is incompatible with google_search — plain text only.
+    # -------------------------------------------------------------------------
+
+    def _generate_with_search(self, contents: str) -> str:
+        """Generate with Gemini's built-in google_search tool enabled.
+        NOTE: JSON response mode is incompatible with google_search — plain text only.
+        """
+        from google.genai import types as genai_types
+        config = genai_types.GenerateContentConfig(
+            tools=[genai_types.Tool(google_search=genai_types.GoogleSearch())],
+            # response_mime_type intentionally NOT set — JSON mode forbidden with google_search
+        )
+        response = self._client.models.generate_content(
+            model=self._consolidation_model_name,
+            contents=contents,
+            config=config,
+        )
+        return response.text
+
+    def research_domain(
+        self,
+        soul: str,
+        knowledge_index: str,
+        existing_sources: str,
+    ) -> tuple[list[ResearchFinding], list[DiscoveredSource]]:
+        """Run an autonomous research session. Returns findings + discovered sources."""
+        prompt = _RESEARCH_PROMPT_TEMPLATE.format(
+            soul=soul,
+            knowledge_index=knowledge_index or "(empty — first research session)",
+            existing_sources=existing_sources,
+        )
+        text = self._generate_with_search(prompt)
+        return self._parse_research_response(text)
+
+    def validate_thesis(
+        self,
+        knowledge_files: list[dict],
+        soul: str,
+    ) -> ThesisValidationResult:
+        """Search for counter-evidence against the top knowledge files."""
+        lines = []
+        for f in knowledge_files[:15]:
+            path = f.get("path", "unknown")
+            content = f.get("content", "")[:500]
+            lines.append(f"### {path}\n{content}\n")
+        files_text = "\n".join(lines)
+
+        prompt = _VALIDATION_PROMPT_TEMPLATE.format(soul=soul, files_text=files_text)
+        text = self._generate_with_search(prompt)
+        return self._parse_validation_response(text)
+
+    # -------------------------------------------------------------------------
+    # Delimited block parsers (used by grounded/search-enabled methods)
+    # -------------------------------------------------------------------------
+
+    def _parse_delimited_blocks(self, text: str, start_marker: str, end_marker: str) -> list[str]:
+        """Extract all text blocks between delimiters. Returns list of block contents."""
+        blocks = []
+        remaining = text
+        while start_marker in remaining:
+            _, _, after_start = remaining.partition(start_marker)
+            block, sep, remaining = after_start.partition(end_marker)
+            if not sep:
+                break  # end marker not found — truncated response
+            if block.strip():
+                blocks.append(block.strip())
+        return blocks
+
+    def _parse_key_value_block(self, block: str) -> dict:
+        """
+        Parse a block like:
+          TITLE: Some title
+          SOURCES:
+          - url1
+          - url2
+          INSIGHTS:
+          - insight1
+          SUMMARY:
+          multi line
+          text
+        Returns dict with scalar keys and list keys (KEY_LIST for list sections).
+        """
+        result = {}
+        lines = block.split("\n")
+        current_key = None
+        current_list = []
+        in_list = False
+        in_multiline = False
+        multiline_buf = []
+
+        LIST_SECTIONS = {"SOURCES", "INSIGHTS"}
+        MULTILINE_SECTIONS = {"SUMMARY"}
+
+        for line in lines:
+            if ":" in line and not line.startswith("-") and not in_multiline:
+                # Save previous
+                if in_list and current_key:
+                    result[f"{current_key}_LIST"] = current_list
+                    current_list = []
+                    in_list = False
+                if in_multiline and current_key:
+                    result[current_key] = "\n".join(multiline_buf).strip()
+                    multiline_buf = []
+                    in_multiline = False
+
+                key, _, val = line.partition(":")
+                key = key.strip()
+                val = val.strip()
+                current_key = key
+
+                if key in LIST_SECTIONS:
+                    in_list = True
+                elif key in MULTILINE_SECTIONS:
+                    in_multiline = True
+                    if val:
+                        multiline_buf.append(val)
+                else:
+                    result[key] = val
+            elif in_list and line.startswith("- "):
+                current_list.append(line[2:].strip())
+            elif in_multiline:
+                multiline_buf.append(line)
+
+        # Flush final section
+        if in_list and current_key:
+            result[f"{current_key}_LIST"] = current_list
+        if in_multiline and current_key:
+            result[current_key] = "\n".join(multiline_buf).strip()
+
+        return result
+
+    def _parse_research_response(self, text: str) -> tuple[list[ResearchFinding], list[DiscoveredSource]]:
+        """Parse delimited block format from a grounded research response."""
+        from datetime import datetime, timezone
+        findings = []
+        sources = []
+
+        for block in self._parse_delimited_blocks(text, "---FINDING_START---", "---FINDING_END---"):
+            try:
+                data = self._parse_key_value_block(block)
+                findings.append(ResearchFinding(
+                    title=data.get("TITLE", "Untitled"),
+                    insights=data.get("INSIGHTS_LIST", []),
+                    relevance_score=float(data.get("RELEVANCE", 0.5)),
+                    suggested_action=data.get("ACTION", "new_concept"),
+                    suggested_target=data.get("TARGET", "research-finding"),
+                    raw_summary=data.get("SUMMARY", ""),
+                    sources_consulted=data.get("SOURCES_LIST", []),
+                ))
+            except Exception as e:
+                logger.warning(f"Skipping malformed FINDING block: {e}")
+
+        for block in self._parse_delimited_blocks(text, "---SOURCE_START---", "---SOURCE_END---"):
+            try:
+                data = self._parse_key_value_block(block)
+                handle = data.get("HANDLE", "NONE")
+                sources.append(DiscoveredSource(
+                    url=data.get("URL", ""),
+                    source_type=data.get("TYPE", "website"),
+                    handle=handle if handle != "NONE" else None,
+                    rationale=data.get("RATIONALE", ""),
+                    discovered_at=datetime.now(timezone.utc).isoformat(),
+                ))
+            except Exception as e:
+                logger.warning(f"Skipping malformed SOURCE block: {e}")
+
+        return findings, sources
+
+    def _parse_validation_response(self, text: str) -> ThesisValidationResult:
+        from datetime import datetime, timezone
+        flagged = []
+        for block in self._parse_delimited_blocks(text, "---FLAG_START---", "---FLAG_END---"):
+            try:
+                data = self._parse_key_value_block(block)
+                flagged.append({
+                    "path": data.get("PATH", ""),
+                    "severity": data.get("SEVERITY", "low"),
+                    "concern": data.get("CONCERN", ""),
+                })
+            except Exception as e:
+                logger.warning(f"Skipping malformed FLAG block: {e}")
+
+        # Extract VALIDATION_SUMMARY section
+        summary = ""
+        if "VALIDATION_SUMMARY:" in text:
+            _, _, after = text.partition("VALIDATION_SUMMARY:")
+            summary = after.strip()
+
+        return ThesisValidationResult(
+            flagged_files=flagged,
+            validation_summary=summary,
+            searched_at=datetime.now(timezone.utc).isoformat(),
+        )

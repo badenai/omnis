@@ -14,6 +14,9 @@ def load_agent_config(config_path: pathlib.Path) -> AgentConfig:
         sources=data.get("sources", {}),
         consolidation_schedule=data.get("consolidation_schedule", "0 3 * * 0"),
         decay=data.get("decay", {"half_life_days": 365}),
+        collection_model=data.get("collection_model", "gemini-3-flash-preview"),
+        consolidation_model=data.get("consolidation_model", "gemini-3.1-pro-preview"),
+        research=data.get("research", {}),
     )
 
 
