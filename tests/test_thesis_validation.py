@@ -4,13 +4,12 @@ from core.consolidation import ConsolidationPipeline
 from core.models.types import AgentConfig, ThesisValidationResult
 
 
-def make_config(research_enabled=True):
+def make_config(mode="accumulate"):
     return AgentConfig(
-        agent_id="test", mode="accumulate", model="gemini",
+        agent_id="test", mode=mode, model="gemini",
         analysis_mode="transcript_only",
         sources={}, consolidation_schedule="0 3 * * 0",
         decay={"half_life_days": 365},
-        research={"enabled": research_enabled},
     )
 
 
@@ -55,8 +54,8 @@ def test_validation_failure_does_not_crash_consolidation_run(tmp_path):
             pytest.fail("Should not propagate exception")
 
 
-def test_validation_skipped_when_research_disabled(tmp_path):
-    config = make_config(research_enabled=False)
+def test_validation_skipped_for_watch_mode(tmp_path):
+    config = make_config(mode="watch")
     provider = MagicMock()
     pipeline = ConsolidationPipeline(tmp_path, config, provider, "soul")
     pipeline._call_thesis_validation_safely()

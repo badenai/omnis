@@ -132,7 +132,7 @@ export default function StatusPanel({ agent }: Props) {
         >
           {triggerReevaluation.isPending ? 'Triggering...' : 'Reevaluate Now'}
         </button>
-        {agent.research?.enabled && (
+        {agent.mode === 'accumulate' && (
           <button
             onClick={handleResearch}
             disabled={triggerResearch.isPending}

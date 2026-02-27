@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateAgent, useUpdateConfig } from '../api/agents';
-import type { AgentDetail, ChannelSource, AgentResearch } from '../types';
+import type { AgentDetail, ChannelSource } from '../types';
 import ChannelList from './ChannelList';
 import CronInput from './CronInput';
 
@@ -28,7 +28,6 @@ export default function AgentForm({ agent }: Props) {
     agent?.consolidation_schedule ?? '0 3 * * 0'
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
-  const [researchEnabled, setResearchEnabled] = useState(agent?.research?.enabled ?? false);
   const [researchSchedule, setResearchSchedule] = useState(agent?.research?.schedule ?? '0 10 * * *');
   const [soul, setSoul] = useState('');
   const [saving, setSaving] = useState(false);
@@ -40,7 +39,7 @@ export default function AgentForm({ agent }: Props) {
     setMessage('');
 
     try {
-      const research: AgentResearch = { enabled: researchEnabled, schedule: researchSchedule };
+      const research = { schedule: researchSchedule };
       if (isEdit) {
         await updateConfig.mutateAsync({
           mode,
@@ -176,26 +175,15 @@ export default function AgentForm({ agent }: Props) {
         />
       </div>
 
-      <div className="border border-gray-800 rounded-lg p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="research-enabled"
-            checked={researchEnabled}
-            onChange={(e) => setResearchEnabled(e.target.checked)}
-            className="w-4 h-4 accent-indigo-500"
-          />
-          <label htmlFor="research-enabled" className="text-sm font-medium text-gray-300">
-            Autonomous Research — Let the AI search the web guided by its soul
+      {mode === 'accumulate' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-400 mb-1">
+            Research Schedule
+            <span className="ml-2 text-xs text-indigo-400 font-normal">accumulate mode — web research is always on</span>
           </label>
+          <CronInput value={researchSchedule} onChange={setResearchSchedule} />
         </div>
-        {researchEnabled && (
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Research Schedule</label>
-            <CronInput value={researchSchedule} onChange={setResearchSchedule} />
-          </div>
-        )}
-      </div>
+      )}
 
       {!isEdit && (
         <div>

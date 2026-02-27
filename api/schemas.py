@@ -15,7 +15,6 @@ class AgentDecay(BaseModel):
 
 
 class AgentResearch(BaseModel):
-    enabled: bool = False
     schedule: str = "0 10 * * *"
 
 

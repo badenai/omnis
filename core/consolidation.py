@@ -181,8 +181,8 @@ class ConsolidationPipeline:
         return "\n".join(lines)
 
     def _call_thesis_validation_safely(self) -> None:
-        """Run thesis validation only if research is enabled; swallow errors so consolidation succeeds."""
-        if not self._config.research.get("enabled", False):
+        """Run thesis validation for accumulate mode; swallow errors so consolidation succeeds."""
+        if self._config.mode != "accumulate":
             return
         try:
             self.run_thesis_validation()
