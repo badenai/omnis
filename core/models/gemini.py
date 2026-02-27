@@ -160,13 +160,42 @@ class GeminiProvider:
         return self._generate(contents, model=self._consolidation_model_name)
 
     def generate_skill(self, briefing: str, soul: str, agent_id: str) -> str:
+        from datetime import date
+        today = date.today().isoformat()
         contents = (
             f"AGENT SOUL:\n{soul}\n\n"
-            f"Convert the following briefing into a Claude Code SKILL.md file. "
-            f"The skill should have YAML frontmatter with name, description, last_updated fields. "
-            f"The body should be structured as a knowledge injection prompt - concise, actionable, "
-            f"ready to be used as context for an implementation agent.\n\n"
-            f"BRIEFING:\n{briefing}"
+            f"AGENT ID: {agent_id}\n\n"
+            f"You are writing a Claude Code SKILL.md file.\n"
+            f"This is NOT a knowledge summary. It is an ACTIVATION PROTOCOL —\n"
+            f"a behavioral instruction set that changes how Claude reasons and acts\n"
+            f"when implementing code in this domain.\n\n"
+            f"Required sections:\n\n"
+            f"1. YAML frontmatter with:\n"
+            f"   name: {agent_id}\n"
+            f"   description: <one sentence — what situation triggers this skill>\n"
+            f"   last_updated: {today}\n\n"
+            f"2. ## Overview\n"
+            f"   One-sentence core principle. Then announce line:\n"
+            f"   'Announce at start: I am using the {agent_id} skill.'\n\n"
+            f"3. ## When to Use\n"
+            f"   Explicit trigger conditions as bullets. Include 'When NOT to use' if relevant.\n\n"
+            f"4. ## The Iron Law\n"
+            f"   The single non-negotiable constraint, in a fenced code block for emphasis.\n\n"
+            f"5. ## Behavioral Rules\n"
+            f"   Imperative rules using MUST / NEVER / BEFORE / WHEN.\n"
+            f"   Action-oriented: 'BEFORE writing X, verify Y' — not 'X is a technique that...'\n\n"
+            f"6. ## Red Flags\n"
+            f"   A table of domain-specific rationalizations someone would actually think,\n"
+            f"   paired with why each is wrong. Format: | Rationalization | Why It's Wrong |\n\n"
+            f"7. ## Quick Reference\n"
+            f"   Compact table: Allowed vs. Forbidden (or equivalent checklist).\n\n"
+            f"Writing rules:\n"
+            f"- Extract BEHAVIORAL CONSTRAINTS from the knowledge — not the knowledge itself\n"
+            f"- Every sentence must be imperative or conditional, never descriptive\n"
+            f"- Red flags must be realistic excuses, not generic ones\n"
+            f"- Concise and scannable: Claude reads this before acting, not for research\n\n"
+            f"KNOWLEDGE BRIEFING (extract behavioral rules from this — do not summarize it):\n"
+            f"{briefing}"
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
