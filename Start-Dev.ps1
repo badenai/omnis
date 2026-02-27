@@ -3,8 +3,8 @@
     Start Cloracle in development mode.
 
 .DESCRIPTION
-    Launches the FastAPI backend (port 8420) and Vite frontend (port 5173)
-    as background jobs. Press Ctrl+C to stop both.
+    Launches the FastAPI backend (port 8420) and Vite frontend (port 5173).
+    Press Ctrl+C to stop both.
 
 .PARAMETER NoFrontend
     Skip starting the frontend dev server.
@@ -17,9 +17,7 @@ param(
     [switch]$NoBrowser
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
 $Root = $PSScriptRoot
 
 # ---------------------------------------------------------------------------
@@ -27,16 +25,16 @@ $Root = $PSScriptRoot
 # ---------------------------------------------------------------------------
 $EnvFile = Join-Path $Root ".env"
 if (Test-Path $EnvFile) {
-    Get-Content $EnvFile | ForEach-Object {
-        if ($_ -match "^\s*([^#][^=]+)=(.*)$") {
-            $name  = $Matches[1].Trim()
-            $value = $Matches[2].Trim()
-            if (-not [System.Environment]::GetEnvironmentVariable($name)) {
-                [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
+    foreach ($line in Get-Content $EnvFile) {
+        if ($line -match "^\s*([^#][^=]+)=(.*)$") {
+            $k = $Matches[1].Trim()
+            $v = $Matches[2].Trim()
+            if (-not [System.Environment]::GetEnvironmentVariable($k, "Process")) {
+                [System.Environment]::SetEnvironmentVariable($k, $v, "Process")
             }
         }
     }
-    Write-Host "  Loaded .env" -ForegroundColor DarkGray
+    Write-Host "Loaded .env" -ForegroundColor DarkGray
 }
 
 # ---------------------------------------------------------------------------
@@ -44,8 +42,8 @@ if (Test-Path $EnvFile) {
 # ---------------------------------------------------------------------------
 if (-not $env:GEMINI_API_KEY -or $env:GEMINI_API_KEY -eq "your-gemini-api-key-here") {
     Write-Host ""
-    Write-Host "  ERROR: GEMINI_API_KEY is not set." -ForegroundColor Red
-    Write-Host "  Add it to .env or set it in your environment before running." -ForegroundColor Red
+    Write-Host "ERROR: GEMINI_API_KEY is not set." -ForegroundColor Red
+    Write-Host "Add it to .env or set it in your environment." -ForegroundColor Red
     Write-Host ""
     exit 1
 }
@@ -54,51 +52,50 @@ if (-not $env:GEMINI_API_KEY -or $env:GEMINI_API_KEY -eq "your-gemini-api-key-he
 # Banner
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "  Cloracle — dev mode" -ForegroundColor Cyan
+Write-Host "Cloracle - dev mode" -ForegroundColor Cyan
 Write-Host "  Backend   http://localhost:8420" -ForegroundColor Green
 if (-not $NoFrontend) {
     Write-Host "  Frontend  http://localhost:5173" -ForegroundColor Green
 }
-Write-Host "  Press Ctrl+C to stop all processes." -ForegroundColor DarkGray
+Write-Host "  Ctrl+C to stop." -ForegroundColor DarkGray
 Write-Host ""
 
 # ---------------------------------------------------------------------------
 # Start backend
 # ---------------------------------------------------------------------------
-$BackendLog = Join-Path $Root ".backend.log"
+$BackendLog    = Join-Path $Root ".backend.log"
+$BackendLogErr = Join-Path $Root ".backend.err.log"
+
+$BackendArgs = "run", "uvicorn", "api.app:create_app",
+               "--factory", "--host", "127.0.0.1", "--port", "8420",
+               "--reload", "--log-level", "info"
+
 $BackendProc = Start-Process -FilePath "uv" `
-    -ArgumentList @(
-        "run", "uvicorn",
-        "api.app:create_app",
-        "--factory",
-        "--host", "127.0.0.1",
-        "--port", "8420",
-        "--reload",
-        "--log-level", "info"
-    ) `
+    -ArgumentList $BackendArgs `
     -WorkingDirectory $Root `
     -RedirectStandardOutput $BackendLog `
-    -RedirectStandardError  "$BackendLog.err" `
-    -NoNewWindow `
-    -PassThru
+    -RedirectStandardError $BackendLogErr `
+    -NoNewWindow -PassThru
 
-Write-Host "  [backend]  PID $($BackendProc.Id) — logging to .backend.log" -ForegroundColor DarkGray
+Write-Host "[backend]  PID $($BackendProc.Id) -- logs: .backend.log / .backend.err.log" -ForegroundColor DarkGray
 
 # ---------------------------------------------------------------------------
 # Start frontend
 # ---------------------------------------------------------------------------
 $FrontendProc = $null
 if (-not $NoFrontend) {
-    $WebDir = Join-Path $Root "web"
-    $FrontendLog = Join-Path $Root ".frontend.log"
+    $WebDir        = Join-Path $Root "web"
+    $FrontendLog   = Join-Path $Root ".frontend.log"
+    $FrontendLogErr = Join-Path $Root ".frontend.err.log"
+
     $FrontendProc = Start-Process -FilePath "npm" `
-        -ArgumentList @("run", "dev") `
+        -ArgumentList "run", "dev" `
         -WorkingDirectory $WebDir `
         -RedirectStandardOutput $FrontendLog `
-        -RedirectStandardError  "$FrontendLog.err" `
-        -NoNewWindow `
-        -PassThru
-    Write-Host "  [frontend] PID $($FrontendProc.Id) — logging to .frontend.log" -ForegroundColor DarkGray
+        -RedirectStandardError $FrontendLogErr `
+        -NoNewWindow -PassThru
+
+    Write-Host "[frontend] PID $($FrontendProc.Id) -- logs: .frontend.log / .frontend.err.log" -ForegroundColor DarkGray
 }
 
 Write-Host ""
@@ -107,46 +104,50 @@ Write-Host ""
 # Open browser after a short delay
 # ---------------------------------------------------------------------------
 if (-not $NoBrowser -and -not $NoFrontend) {
-    Start-Job -ScriptBlock {
-        Start-Sleep -Seconds 3
-        Start-Process "http://localhost:5173"
-    } | Out-Null
+    Start-Job -ScriptBlock { Start-Sleep 3; Start-Process "http://localhost:5173" } | Out-Null
 }
 
 # ---------------------------------------------------------------------------
-# Tail logs and wait — Ctrl+C triggers finally block
+# Wait -- Ctrl+C triggers the finally block
 # ---------------------------------------------------------------------------
+$BackendLogPos = 0
+
 try {
     while ($true) {
-        # Surface any new backend output to the console
-        if (Test-Path $BackendLog) {
-            $lines = Get-Content $BackendLog -Tail 0 -Wait -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Seconds 1
+        Start-Sleep -Milliseconds 500
 
-        # Exit early if backend dies unexpectedly
+        # Stream new backend log lines to console
+        if (Test-Path $BackendLogErr) {
+            $newLines = Get-Content $BackendLogErr | Select-Object -Skip $BackendLogPos
+            foreach ($l in $newLines) {
+                Write-Host "  [api] $l" -ForegroundColor DarkGray
+            }
+            $BackendLogPos += $newLines.Count
+        }
+
+        # Detect unexpected backend exit
         if ($BackendProc.HasExited) {
             Write-Host ""
-            Write-Host "  Backend exited (code $($BackendProc.ExitCode)). Check .backend.log." -ForegroundColor Red
+            Write-Host "Backend exited unexpectedly (code $($BackendProc.ExitCode))." -ForegroundColor Red
+            Write-Host "Check .backend.err.log for details." -ForegroundColor Red
             break
         }
     }
-} finally {
+}
+finally {
     Write-Host ""
-    Write-Host "  Stopping..." -ForegroundColor Yellow
+    Write-Host "Stopping..." -ForegroundColor Yellow
 
-    if ($FrontendProc -and -not $FrontendProc.HasExited) {
+    if ($null -ne $FrontendProc -and -not $FrontendProc.HasExited) {
         Stop-Process -Id $FrontendProc.Id -Force -ErrorAction SilentlyContinue
-        Write-Host "  [frontend] stopped." -ForegroundColor DarkGray
+        Write-Host "[frontend] stopped." -ForegroundColor DarkGray
     }
     if (-not $BackendProc.HasExited) {
         Stop-Process -Id $BackendProc.Id -Force -ErrorAction SilentlyContinue
-        Write-Host "  [backend]  stopped." -ForegroundColor DarkGray
+        Write-Host "[backend]  stopped." -ForegroundColor DarkGray
     }
 
-    # Clean up background jobs
     Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
-
-    Write-Host "  Done." -ForegroundColor Green
+    Write-Host "Done." -ForegroundColor Green
     Write-Host ""
 }
