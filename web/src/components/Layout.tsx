@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import ActivityPanel from './ActivityPanel';
 
 export default function Layout() {
   return (
@@ -27,6 +28,8 @@ export default function Layout() {
             Scheduler
           </NavLink>
         </div>
+        <div className="flex-1" />
+        <ActivityPanel />
       </nav>
       <main className="flex-1 overflow-auto">
         <Outlet />
