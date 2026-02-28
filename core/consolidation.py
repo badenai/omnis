@@ -120,7 +120,7 @@ class ConsolidationPipeline:
             sw.write(skill_content, self._config.agent_id)
 
             reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md", self._config.mode)
+            reg.register(self._config.agent_id, self._dir / "SKILL.md", "")
             reg.save()
 
             self._update_index(knowledge_files)
