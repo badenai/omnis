@@ -1,9 +1,9 @@
 import os
 import signal
-import pathlib
 import logging
 from dotenv import load_dotenv
 from core.agent_loader import load_agent
+from core.constants import APP_NAME, DATA_DIR
 from core.scheduler import build_scheduler
 from core.scheduler_instance import set_scheduler
 
@@ -15,8 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-WORKSPACE = pathlib.Path.home() / ".cloracle"
-AGENTS_DIR = WORKSPACE / "agents"
+AGENTS_DIR = DATA_DIR / "agents"
 
 
 def main():
@@ -62,7 +61,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        logger.info("Shutting down cloracle. Goodbye.")
+        logger.info(f"Shutting down {APP_NAME}. Goodbye.")
         scheduler.shutdown(wait=False)
 
 

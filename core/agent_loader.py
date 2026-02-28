@@ -4,6 +4,7 @@ from core.models.gemini import GeminiProvider
 from core.pipeline import CollectionPipeline
 from core.consolidation import ConsolidationPipeline
 from core.research_session import ResearchSession
+from core.manual_ingestion import ManualIngestionPipeline
 
 
 def load_agent(agent_dir: pathlib.Path, gemini_api_key: str) -> dict:
@@ -27,4 +28,5 @@ def load_agent(agent_dir: pathlib.Path, gemini_api_key: str) -> dict:
         "collection": CollectionPipeline(agent_dir, config, provider, soul),
         "consolidation": ConsolidationPipeline(agent_dir, config, provider, soul),
         "research": ResearchSession(agent_dir, config, provider, soul),
+        "ingestion": ManualIngestionPipeline(agent_dir, config, provider, soul),
     }

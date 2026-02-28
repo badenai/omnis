@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useKnowledge, useKnowledgeFile, useSkill, useMemory, useKnowledgeSearch } from '../api/knowledge';
 
 interface Props {
@@ -106,8 +107,8 @@ export default function KnowledgeBrowser({ agentId }: Props) {
       {/* Content */}
       <div className="flex-1 border border-gray-800 rounded-lg overflow-auto">
         {activeContent ? (
-          <div className="p-4 prose prose-invert prose-sm max-w-none">
-            <Markdown>{activeContent}</Markdown>
+          <div className="p-4 prose prose-invert prose-sm max-w-none prose-headings:text-gray-100 prose-p:text-gray-300 prose-strong:text-gray-100 prose-code:text-indigo-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700 prose-table:text-sm prose-th:text-gray-300 prose-td:text-gray-400 prose-a:text-indigo-400 prose-li:text-gray-300 prose-blockquote:border-indigo-500 prose-blockquote:text-gray-400 prose-hr:border-gray-700">
+            <Markdown remarkPlugins={[remarkGfm]}>{activeContent}</Markdown>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">

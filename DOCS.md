@@ -1,8 +1,8 @@
-# Cloracle — Documentation for Dummies
+# Omnis — Documentation for Dummies
 
-## What is Cloracle?
+## What is Omnis?
 
-Cloracle is a **knowledge agent system** that automatically learns about topics you care about. Think of it as a personal research assistant that:
+Omnis is a **knowledge agent system** that automatically learns about topics you care about. Think of it as a personal research assistant that:
 
 1. Watches YouTube channels for new videos
 2. Reads and analyzes those videos to extract key insights
@@ -10,7 +10,7 @@ Cloracle is a **knowledge agent system** that automatically learns about topics 
 4. Consolidates that knowledge into a comprehensive briefing document
 5. Exports everything as a **SKILL.md file** you can inject into Claude Code
 
-**In one sentence:** Cloracle watches channels you care about, extracts what matters to you specifically, and keeps your Claude sessions informed about it.
+**In one sentence:** Omnis watches channels you care about, extracts what matters to you specifically, and keeps your Claude sessions informed about it.
 
 ---
 
@@ -83,8 +83,8 @@ An AI-generated executive summary of all weighted knowledge, structured by mode:
 
 ### SKILL.md
 A Claude Code skill file — condensed, actionable knowledge from the briefing, formatted so Claude can use it as context. Written to two places:
-- `~/.cloracle/agents/<id>/SKILL.md` (your copy)
-- `~/.claude/plugins/cache/cloracle/<id>/SKILL.md` (Claude Code picks this up automatically)
+- `~/.omnis/agents/<id>/SKILL.md` (your copy)
+- `~/.claude/plugins/cache/omnis/<id>/SKILL.md` (Claude Code picks this up automatically)
 
 ---
 
@@ -220,14 +220,14 @@ curl http://localhost:8420/api/scheduler/activity
 ```
 
 ### Manually (files)
-Everything lives in `~/.cloracle/agents/<id>/`. Edit config.yaml or SOUL.md directly, then restart the server for config changes to take effect.
+Everything lives in `~/.omnis/agents/<id>/`. Edit config.yaml or SOUL.md directly, then restart the server for config changes to take effect.
 
 ---
 
 ## File Structure
 
 ```
-~/.cloracle/
+~/.omnis/
 ├── agents/
 │   └── my-agent/
 │       ├── config.yaml        ← settings
@@ -250,7 +250,7 @@ Everything lives in `~/.cloracle/agents/<id>/`. Edit config.yaml or SOUL.md dire
 
 ## How SKILL.md Works with Claude Code
 
-After consolidation, SKILL.md lands at `~/.claude/plugins/cache/cloracle/<agent-id>/SKILL.md`. Claude Code reads skills from this directory and can inject them as context into your conversations.
+After consolidation, SKILL.md lands at `~/.claude/plugins/cache/omnis/<agent-id>/SKILL.md`. Claude Code reads skills from this directory and can inject them as context into your conversations.
 
 The skill contains condensed, actionable knowledge from your briefing — whatever is most relevant based on effective weight. It's regenerated every consolidation cycle, so it stays current.
 

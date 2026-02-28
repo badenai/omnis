@@ -1,4 +1,4 @@
-# cloracle - Project Instructions
+# omnis - Project Instructions
 
 ## Python Tooling
 - Use `uv` as the Python package manager (not `pip`)

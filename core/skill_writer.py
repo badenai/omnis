@@ -2,7 +2,9 @@ import json
 import pathlib
 from datetime import datetime, timezone
 
-_PLUGIN_KEY = "cloracle@cloracle"
+from core.constants import APP_NAME
+
+_PLUGIN_KEY = f"{APP_NAME}@{APP_NAME}"
 _PLUGIN_VERSION = "1.0.0"
 
 
@@ -16,11 +18,11 @@ class SkillWriter:
         local.write_text(skill_content, encoding="utf-8")
 
         # Global copy in the Claude Code plugin cache — correct discoverable path:
-        # ~/.claude/plugins/cache/cloracle/cloracle/{version}/skills/{agent_id}/SKILL.md
+        # ~/.claude/plugins/cache/{APP_NAME}/{APP_NAME}/{version}/skills/{agent_id}/SKILL.md
         install_path = (
             pathlib.Path.home()
             / ".claude" / "plugins" / "cache"
-            / "cloracle" / "cloracle" / _PLUGIN_VERSION
+            / APP_NAME / APP_NAME / _PLUGIN_VERSION
         )
         skill_dir = install_path / "skills" / agent_id
         skill_dir.mkdir(parents=True, exist_ok=True)

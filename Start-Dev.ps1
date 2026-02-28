@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Start Cloracle in development mode.
+    Start Omnis in development mode.
 
 .DESCRIPTION
     Launches the FastAPI backend (port 8420) and Vite frontend (port 5173).
@@ -52,7 +52,7 @@ if (-not $env:GEMINI_API_KEY -or $env:GEMINI_API_KEY -eq "your-gemini-api-key-he
 # Banner
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "Cloracle - dev mode" -ForegroundColor Cyan
+Write-Host "Omnis - dev mode" -ForegroundColor Cyan
 Write-Host "  Backend   http://localhost:8420" -ForegroundColor Green
 if (-not $NoFrontend) {
     Write-Host "  Frontend  http://localhost:5173" -ForegroundColor Green
@@ -110,26 +110,40 @@ if (-not $NoBrowser -and -not $NoFrontend) {
 # ---------------------------------------------------------------------------
 # Wait -- Ctrl+C triggers the finally block
 # ---------------------------------------------------------------------------
-$BackendLogPos = 0
+$Pos = @{
+    BackendOut  = 0
+    BackendErr  = 0
+    FrontendOut = 0
+    FrontendErr = 0
+}
+
+function Drain-Log($path, $posKey, $prefix, $color) {
+    if (Test-Path $path) {
+        $lines = Get-Content $path
+        $newLines = $lines | Select-Object -Skip $Pos[$posKey]
+        foreach ($l in $newLines) {
+            Write-Host "$prefix $l" -ForegroundColor $color
+        }
+        $Pos[$posKey] += $newLines.Count
+    }
+}
 
 try {
     while ($true) {
-        Start-Sleep -Milliseconds 500
+        Start-Sleep -Milliseconds 300
 
-        # Stream new backend log lines to console
-        if (Test-Path $BackendLogErr) {
-            $newLines = Get-Content $BackendLogErr | Select-Object -Skip $BackendLogPos
-            foreach ($l in $newLines) {
-                Write-Host "  [api] $l" -ForegroundColor DarkGray
-            }
-            $BackendLogPos += $newLines.Count
+        Drain-Log $BackendLog    "BackendOut"  "[api]" DarkGray
+        Drain-Log $BackendLogErr "BackendErr"  "[api]" DarkGray
+
+        if (-not $NoFrontend) {
+            Drain-Log $FrontendLog    "FrontendOut" "[web]" DarkCyan
+            Drain-Log $FrontendLogErr "FrontendErr" "[web]" DarkCyan
         }
 
         # Detect unexpected backend exit
         if ($BackendProc.HasExited) {
             Write-Host ""
             Write-Host "Backend exited unexpectedly (code $($BackendProc.ExitCode))." -ForegroundColor Red
-            Write-Host "Check .backend.err.log for details." -ForegroundColor Red
             break
         }
     }

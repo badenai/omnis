@@ -27,7 +27,7 @@ def test_write_skill_copies_to_correct_claude_skills_path(tmp_path):
         sw.write("# Skill Content", agent_id="trading")
     expected = (
         tmp_path / ".claude" / "plugins" / "cache"
-        / "cloracle" / "cloracle" / PLUGIN_VERSION
+        / "omnis" / "omnis" / PLUGIN_VERSION
         / "skills" / "trading" / "SKILL.md"
     )
     assert expected.exists(), f"Expected skill at {expected}"
@@ -35,7 +35,7 @@ def test_write_skill_copies_to_correct_claude_skills_path(tmp_path):
 
 
 def test_write_skill_registers_plugin_in_installed_plugins(tmp_path):
-    """First write must create the cloracle@cloracle entry in installed_plugins.json."""
+    """First write must create the omnis@omnis entry in installed_plugins.json."""
     agent_dir = tmp_path / "agents" / "trading"
     agent_dir.mkdir(parents=True)
     plugins_file = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
@@ -47,12 +47,12 @@ def test_write_skill_registers_plugin_in_installed_plugins(tmp_path):
         sw.write("# Content", agent_id="trading")
 
     data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    assert "cloracle@cloracle" in data["plugins"]
-    entry = data["plugins"]["cloracle@cloracle"][0]
+    assert "omnis@omnis" in data["plugins"]
+    entry = data["plugins"]["omnis@omnis"][0]
     assert entry["scope"] == "user"
     assert entry["version"] == PLUGIN_VERSION
     expected_install_path = str(
-        tmp_path / ".claude" / "plugins" / "cache" / "cloracle" / "cloracle" / PLUGIN_VERSION
+        tmp_path / ".claude" / "plugins" / "cache" / "omnis" / "omnis" / PLUGIN_VERSION
     )
     assert entry["installPath"] == expected_install_path
 
@@ -71,7 +71,7 @@ def test_write_skill_updates_last_updated_on_refresh(tmp_path):
         sw.write("# v2", agent_id="trading")
 
     data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    entries = data["plugins"]["cloracle@cloracle"]
+    entries = data["plugins"]["omnis@omnis"]
     assert len(entries) == 1, "Should not create duplicate entries"
 
 
@@ -87,7 +87,7 @@ def test_write_skill_creates_installed_plugins_if_missing(tmp_path):
     plugins_file = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
     assert plugins_file.exists()
     data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    assert "cloracle@cloracle" in data["plugins"]
+    assert "omnis@omnis" in data["plugins"]
 
 
 def test_registry_register_and_save(tmp_path):

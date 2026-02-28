@@ -6,6 +6,7 @@ from urllib.error import URLError
 from html.parser import HTMLParser
 
 from core.collector import fetch_transcript, get_channel_videos
+from core.constants import APP_NAME
 from core.inbox import InboxWriter
 from core.models.types import AgentConfig
 from core.state import AgentState
@@ -45,7 +46,7 @@ class _TextExtractor(HTMLParser):
 def _fetch_web_text(url: str) -> tuple[str, str]:
     """Return (title_hint, plain_text). Raises ValueError on failure."""
     try:
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; cloracle/1.0)"})
+        req = Request(url, headers={"User-Agent": f"Mozilla/5.0 (compatible; {APP_NAME}/1.0)"})
         with urlopen(req, timeout=15) as resp:
             html = resp.read().decode("utf-8", errors="replace")
     except Exception as e:
