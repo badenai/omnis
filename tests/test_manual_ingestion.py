@@ -155,6 +155,8 @@ def test_run_channel_uses_full_video_mode(tmp_path):
     with patch("core.manual_ingestion.get_channel_videos", return_value=videos):
         pipeline.run_channel("https://youtube.com/@test")
     provider.analyze_video.assert_called_once()
+    call_args = provider.analyze_video.call_args[0]
+    assert call_args[2] == "https://www.youtube.com/watch?v=v1"
     provider.analyze_transcript.assert_not_called()
 
 

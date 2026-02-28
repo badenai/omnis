@@ -125,8 +125,9 @@ class ManualIngestionPipeline:
                 job_status.update_step(agent_id, task, f"Analyzing video {vid_id}...")
                 try:
                     if self._config.analysis_mode == "full_video" and self._config.model == "gemini":
+                        vid_url = f"https://www.youtube.com/watch?v={vid_id}"
                         result = self._provider.analyze_video(
-                            vid_id, vid["title"], url, self._soul,
+                            vid_id, vid["title"], vid_url, self._soul,
                             "Extract key insights relevant to this agent's domain.",
                         )
                     else:
