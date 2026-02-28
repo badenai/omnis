@@ -511,3 +511,22 @@ class GeminiProvider:
             validation_summary=summary,
             searched_at=datetime.now(timezone.utc).isoformat(),
         )
+
+    def stream_query(self, system_prompt: str, message: str, history: list[dict]):
+        """Yields string tokens from a streaming Gemini chat."""
+        from google.genai import types as gtypes
+
+        contents = []
+        for h in history:
+            role = "user" if h.get("role") == "user" else "model"
+            contents.append(gtypes.Content(role=role, parts=[gtypes.Part(text=h["content"])]))
+        contents.append(gtypes.Content(role="user", parts=[gtypes.Part(text=message)]))
+
+        response = self._client.models.generate_content_stream(
+            model=self._consolidation_model_name,
+            contents=contents,
+            config=gtypes.GenerateContentConfig(system_instruction=system_prompt),
+        )
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
