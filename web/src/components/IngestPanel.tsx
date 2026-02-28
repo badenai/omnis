@@ -29,6 +29,7 @@ export default function IngestPanel({ agent }: Props) {
   const channelPreview = useChannelPreview(agent.agent_id);
   const channelExecute = useChannelExecute(agent.agent_id);
   const [channelConfirm, setChannelConfirm] = useState<{
+    url: string;
     count: number;
     videos: { id: string; title: string }[];
   } | null>(null);
@@ -74,7 +75,7 @@ export default function IngestPanel({ agent }: Props) {
     try {
       const preview = await channelPreview.mutateAsync(url.trim());
       if (preview.count > 50) {
-        setChannelConfirm(preview);
+        setChannelConfirm({ url: url.trim(), ...preview });
       } else {
         await channelExecute.mutateAsync({ url: url.trim(), limit: null });
         setUrlMessage(`Scanning ${preview.count} videos — check Activity for progress.`);
@@ -86,7 +87,7 @@ export default function IngestPanel({ agent }: Props) {
   };
 
   const handleChannelConfirm = async (limit: number | null) => {
-    const u = url.trim();
+    const u = channelConfirm!.url;   // use the previewed URL, not current input
     setChannelConfirm(null);
     try {
       await channelExecute.mutateAsync({ url: u, limit });

@@ -104,6 +104,9 @@ def test_analyze_uploaded_file_calls_files_api():
     mock_file = MagicMock()
     mock_file.name = "files/abc123"
     provider._client.files.upload.return_value = mock_file
+    mock_info = MagicMock()
+    mock_info.state.name = "ACTIVE"
+    provider._client.files.get.return_value = mock_info
     mock_resp = MagicMock()
     mock_resp.text = json.dumps({
         "video_id": "file-abc", "video_title": "document.pdf",
