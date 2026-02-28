@@ -20,7 +20,7 @@ class AgentResearch(BaseModel):
 
 class AgentConfigCreate(BaseModel):
     agent_id: str
-    mode: str = "accumulate"
+    mode: str = ""
     model: str = "gemini"
     analysis_mode: str = "transcript_only"
     sources: AgentSources = AgentSources()
@@ -50,7 +50,7 @@ class SoulUpdate(BaseModel):
 
 class AgentSummary(BaseModel):
     agent_id: str
-    mode: str
+    mode: str = ""
     model: str
     analysis_mode: str
     consolidation_schedule: str
@@ -62,7 +62,7 @@ class AgentSummary(BaseModel):
 
 class AgentDetail(BaseModel):
     agent_id: str
-    mode: str
+    mode: str = ""
     model: str
     analysis_mode: str
     sources: dict

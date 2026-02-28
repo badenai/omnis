@@ -55,7 +55,7 @@ class ConsolidationPipeline:
             knowledge_files = kw.load_all_weighted()
 
             job_status.update_step(agent_id, task, "Generating memory.md...")
-            briefing = self._provider.generate_briefing(knowledge_files, self._soul, self._config.mode)
+            briefing = self._provider.generate_briefing(knowledge_files, self._soul)
             (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
@@ -69,7 +69,7 @@ class ConsolidationPipeline:
             reg.register(
                 self._config.agent_id,
                 self._dir / "SKILL.md",
-                self._config.mode,
+                "",
             )
             reg.save()
 
@@ -111,7 +111,7 @@ class ConsolidationPipeline:
             knowledge_files = kw.load_all_weighted()
 
             job_status.update_step(agent_id, task, "Generating memory.md...")
-            briefing = self._provider.generate_briefing(knowledge_files, self._soul, self._config.mode)
+            briefing = self._provider.generate_briefing(knowledge_files, self._soul)
             (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
@@ -182,9 +182,7 @@ class ConsolidationPipeline:
         return "\n".join(lines)
 
     def _call_thesis_validation_safely(self) -> None:
-        """Run thesis validation for accumulate mode; swallow errors so consolidation succeeds."""
-        if self._config.mode != "accumulate":
-            return
+        """Run thesis validation; swallow errors so consolidation succeeds."""
         try:
             self.run_thesis_validation()
         except Exception:
