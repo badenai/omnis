@@ -137,7 +137,7 @@ export default function IngestPanel({ agent }: Props) {
             <input
               type="text"
               value={url}
-              onChange={(e) => { setUrl(e.target.value); setUrlMessage(''); }}
+              onChange={(e) => { setUrl(e.target.value); setUrlMessage(''); setChannelConfirm(null); }}
               onKeyDown={(e) => e.key === 'Enter' && (isChannel ? handleScanChannel() : handleIngestUrl())}
               placeholder="https://..."
               className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
@@ -190,7 +190,7 @@ export default function IngestPanel({ agent }: Props) {
                 All {channelConfirm.count}
               </button>
               <button
-                onClick={() => { setChannelConfirm(null); setUrl(''); }}
+                onClick={() => setChannelConfirm(null)}
                 className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors text-gray-300"
               >
                 Cancel
