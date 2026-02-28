@@ -34,6 +34,14 @@ export function useBriefing(agentId: string) {
   });
 }
 
+export function useMemory(agentId: string) {
+  return useQuery({
+    queryKey: ['knowledge', agentId, 'memory'],
+    queryFn: () => apiFetch<{ content: string }>(`/knowledge/${agentId}/memory`),
+    enabled: !!agentId,
+  });
+}
+
 export function useInbox(agentId: string) {
   return useQuery({
     queryKey: ['knowledge', agentId, 'inbox'],

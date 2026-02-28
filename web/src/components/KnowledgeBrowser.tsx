@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
-import { useKnowledge, useKnowledgeFile, useSkill, useBriefing, useKnowledgeSearch } from '../api/knowledge';
+import { useKnowledge, useKnowledgeFile, useSkill, useMemory, useKnowledgeSearch } from '../api/knowledge';
 
 interface Props {
   agentId: string;
@@ -10,11 +10,11 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const { data: files, isLoading } = useKnowledge(agentId);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [specialView, setSpecialView] = useState<'skill' | 'briefing' | null>(null);
+  const [specialView, setSpecialView] = useState<'skill' | 'memory' | null>(null);
 
   const { data: fileContent } = useKnowledgeFile(agentId, specialView ? null : selectedPath);
   const { data: skill } = useSkill(agentId);
-  const { data: briefing } = useBriefing(agentId);
+  const { data: memory } = useMemory(agentId);
   const { data: searchResults } = useKnowledgeSearch(agentId, searchQuery);
 
   if (isLoading) return <div className="text-gray-400">Loading knowledge...</div>;
@@ -23,8 +23,8 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const activeContent =
     specialView === 'skill'
       ? skill?.content
-      : specialView === 'briefing'
-      ? briefing?.content
+      : specialView === 'memory'
+      ? memory?.content
       : fileContent?.content;
 
   // Group files by directory
@@ -60,12 +60,12 @@ export default function KnowledgeBrowser({ agentId }: Props) {
             SKILL.md
           </button>
           <button
-            onClick={() => { setSpecialView('briefing'); setSelectedPath(null); }}
+            onClick={() => { setSpecialView('memory'); setSelectedPath(null); }}
             className={`w-full text-left px-2 py-1.5 rounded text-xs font-medium ${
-              specialView === 'briefing' ? 'bg-indigo-600/20 text-indigo-300' : 'text-gray-400 hover:bg-gray-800'
+              specialView === 'memory' ? 'bg-indigo-600/20 text-indigo-300' : 'text-gray-400 hover:bg-gray-800'
             }`}
           >
-            briefing.md
+            memory.md
           </button>
         </div>
 
