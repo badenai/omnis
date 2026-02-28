@@ -19,19 +19,18 @@ def test_analysis_result_fields():
 def test_agent_config_defaults():
     cfg = AgentConfig(
         agent_id="test-agent",
-        mode="accumulate",
         model="gemini",
         analysis_mode="full_video",
         sources={"youtube_channels": []},
         consolidation_schedule="0 3 * * 0",
         decay={"half_life_days": 365},
     )
-    assert cfg.mode == "accumulate"
+    assert cfg.agent_id == "test-agent"
 
 
 def test_agent_config_has_research_field():
     config = AgentConfig(
-        agent_id="test", mode="accumulate", model="gemini",
+        agent_id="test", model="gemini",
         analysis_mode="transcript_only",
         sources={}, consolidation_schedule="0 3 * * 0", decay={},
     )

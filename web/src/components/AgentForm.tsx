@@ -16,7 +16,6 @@ export default function AgentForm({ agent }: Props) {
   const updateConfig = useUpdateConfig(agent?.agent_id ?? '');
 
   const [agentId, setAgentId] = useState(agent?.agent_id ?? '');
-  const [mode, setMode] = useState(agent?.mode ?? 'accumulate');
   const [model, setModel] = useState(agent?.model ?? 'gemini');
   const [analysisMode, setAnalysisMode] = useState(agent?.analysis_mode ?? 'transcript_only');
   const [collectionModel, setCollectionModel] = useState(agent?.collection_model ?? 'gemini-3-flash-preview');
@@ -42,7 +41,6 @@ export default function AgentForm({ agent }: Props) {
       const research = { schedule: researchSchedule };
       if (isEdit) {
         await updateConfig.mutateAsync({
-          mode,
           model,
           analysis_mode: analysisMode,
           sources: { youtube_channels: channels },
@@ -56,7 +54,6 @@ export default function AgentForm({ agent }: Props) {
       } else {
         await createAgent.mutateAsync({
           agent_id: agentId,
-          mode,
           model,
           analysis_mode: analysisMode,
           sources: { youtube_channels: channels },
@@ -93,18 +90,7 @@ export default function AgentForm({ agent }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Mode</label>
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-          >
-            <option value="accumulate">accumulate</option>
-            <option value="watch">watch</option>
-          </select>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1">Model</label>
           <select
@@ -175,15 +161,10 @@ export default function AgentForm({ agent }: Props) {
         />
       </div>
 
-      {mode === 'accumulate' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">
-            Research Schedule
-            <span className="ml-2 text-xs text-indigo-400 font-normal">accumulate mode — web research is always on</span>
-          </label>
-          <CronInput value={researchSchedule} onChange={setResearchSchedule} />
-        </div>
-      )}
+      <div>
+        <label className="block text-sm font-medium text-gray-400 mb-1">Research Schedule</label>
+        <CronInput value={researchSchedule} onChange={setResearchSchedule} />
+      </div>
 
       {!isEdit && (
         <div>

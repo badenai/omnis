@@ -51,13 +51,10 @@ export default function AgentList() {
             >
               {/* Card Header */}
               <div className="p-6 border-b border-white/5">
-                <div className="flex justify-between items-start mb-4">
+                <div className="mb-4">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center shadow-inner ring-1 ring-white/10">
                     <span className="text-lg font-bold text-white uppercase tracking-wider">{a.agent_id.substring(0, 1)}</span>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase shadow-sm ${a.mode === 'accumulate' ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20'}`}>
-                    {a.mode}
-                  </span>
                 </div>
                 
                 <h3 className="text-xl font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors line-clamp-1" title={a.agent_id}>{a.agent_id}</h3>

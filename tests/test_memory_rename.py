@@ -8,11 +8,10 @@ def test_consolidation_writes_memory_md(tmp_path, mocker):
     from core.models.types import AgentConfig
 
     config = AgentConfig(
-        agent_id="test", mode="accumulate", model="gemini",
+        agent_id="test", model="gemini",
         analysis_mode="transcript_only", sources={},
         consolidation_schedule="0 3 * * 0",
-        decay={"half_life_days": 365},
-    )
+        decay={"half_life_days": 365})
     provider = mocker.MagicMock()
     provider.consolidate.return_value = mocker.MagicMock(decisions=[])
     provider.generate_briefing.return_value = "# Memory\nTest content."

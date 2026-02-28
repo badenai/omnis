@@ -45,7 +45,6 @@ def _agent_summary(agent: dict) -> AgentSummary:
 
     return AgentSummary(
         agent_id=config.agent_id,
-        mode=config.mode,
         model=config.model,
         analysis_mode=config.analysis_mode,
         consolidation_schedule=config.consolidation_schedule,
@@ -66,7 +65,6 @@ def _agent_detail(agent: dict) -> AgentDetail:
 
     return AgentDetail(
         agent_id=config.agent_id,
-        mode=config.mode,
         model=config.model,
         analysis_mode=config.analysis_mode,
         sources=config.sources,
@@ -126,7 +124,6 @@ def create_agent(body: AgentConfigCreate, request: Request):
 
     config_data = {
         "agent_id": body.agent_id,
-        "mode": body.mode,
         "model": body.model,
         "analysis_mode": body.analysis_mode,
         "sources": {
@@ -167,7 +164,6 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
     # Build updated config dict
     config_data = {
         "agent_id": config.agent_id,
-        "mode": body.mode if body.mode is not None else config.mode,
         "model": body.model if body.model is not None else config.model,
         "analysis_mode": body.analysis_mode if body.analysis_mode is not None else config.analysis_mode,
         "sources": (

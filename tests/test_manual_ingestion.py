@@ -6,19 +6,17 @@ from core.models.types import AgentConfig, AnalysisResult
 
 def make_config():
     return AgentConfig(
-        agent_id="test", mode="accumulate", model="gemini",
+        agent_id="test", model="gemini",
         analysis_mode="transcript_only",
         sources={}, consolidation_schedule="0 3 * * 0",
-        decay={"half_life_days": 365},
-    )
+        decay={"half_life_days": 365})
 
 
 def make_result(title="Test"):
     return AnalysisResult(
         video_id="x", video_title=title, insights=["i"],
         relevance_score=0.8, suggested_action="new_concept",
-        suggested_target="test", raw_summary="summary",
-    )
+        suggested_target="test", raw_summary="summary")
 
 
 def test_ingest_youtube_url_full_video(tmp_path):
@@ -86,8 +84,7 @@ from core.models.types import AnalysisResult
 def _make_result(video_id="v1"):
     return AnalysisResult(
         video_id=video_id, video_title="T", insights=[], relevance_score=0.9,
-        suggested_action="new_concept", suggested_target="test", raw_summary="s",
-    )
+        suggested_action="new_concept", suggested_target="test", raw_summary="s")
 
 
 def _make_pipeline(tmp_path, analysis_mode="transcript_only"):

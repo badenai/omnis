@@ -8,7 +8,6 @@ def load_agent_config(config_path: pathlib.Path) -> AgentConfig:
         data = yaml.safe_load(f)
     return AgentConfig(
         agent_id=data["agent_id"],
-        mode=data["mode"],
         model=data["model"],
         analysis_mode=data.get("analysis_mode", "transcript_only"),
         sources=data.get("sources", {}),

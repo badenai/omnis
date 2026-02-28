@@ -7,7 +7,6 @@ FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 def test_load_agent_config():
     cfg = load_agent_config(FIXTURES / "trading-agent-config.yaml")
     assert cfg.agent_id == "trading-price-action"
-    assert cfg.mode == "accumulate"
     assert cfg.model == "gemini"
     assert len(cfg.sources["youtube_channels"]) == 1
 

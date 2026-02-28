@@ -66,5 +66,4 @@ class AgentConfig:
     consolidation_model: str = "gemini-3.1-pro-preview"
     research: dict = field(default_factory=dict)
     reflect_immediately: bool = False
-    mode: str = ""                 # kept for backward-compat loading old configs; unused
     # Shape: {"enabled": bool, "schedule": "cron string"}

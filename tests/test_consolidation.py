@@ -5,12 +5,11 @@ from core.models.types import AgentConfig, ConsolidationResult
 
 def _make_config():
     return AgentConfig(
-        agent_id="test-agent", mode="accumulate", model="gemini",
+        agent_id="test-agent", model="gemini",
         analysis_mode="full_video",
         sources={"youtube_channels": []},
         consolidation_schedule="0 3 * * 0",
-        decay={"half_life_days": 365},
-    )
+        decay={"half_life_days": 365})
 
 
 def test_consolidation_skips_when_inbox_empty(tmp_path):

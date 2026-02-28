@@ -9,10 +9,9 @@ def _make_app(mocker, agent_dir, soul="Expert."):
     app = create_app()
 
     config = AgentConfig(
-        agent_id="test-agent", mode="accumulate", model="gemini",
+        agent_id="test-agent", model="gemini",
         analysis_mode="transcript_only", sources={},
-        consolidation_schedule="0 3 * * 0", decay={"half_life_days": 365},
-    )
+        consolidation_schedule="0 3 * * 0", decay={"half_life_days": 365})
     provider = mocker.MagicMock()
     provider.stream_query.return_value = iter(["Hello", " world"])
 

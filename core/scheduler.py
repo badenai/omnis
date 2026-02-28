@@ -45,21 +45,20 @@ def build_scheduler(agents: list[dict], scheduler: BackgroundScheduler | None = 
         )
         logger.info(f"Scheduled consolidation: {config.agent_id} @ {cron}")
 
-        # Autonomous research session — always on for accumulate mode
-        if config.mode == "accumulate":
-            research_session = agent.get("research")
-            if research_session:
-                r_cron = config.research.get("schedule", "0 10 * * *")
-                r_parts = r_cron.split()
-                scheduler.add_job(
-                    research_session.run,
-                    trigger=CronTrigger(
-                        minute=r_parts[0], hour=r_parts[1],
-                        day=r_parts[2], month=r_parts[3], day_of_week=r_parts[4],
-                    ),
-                    id=f"{config.agent_id}_research",
-                    name=f"Research session {config.agent_id}",
-                )
-                logger.info(f"Scheduled research session: {config.agent_id} @ {r_cron}")
+        # Autonomous research session
+        research_session = agent.get("research")
+        if research_session:
+            r_cron = config.research.get("schedule", "0 10 * * *")
+            r_parts = r_cron.split()
+            scheduler.add_job(
+                research_session.run,
+                trigger=CronTrigger(
+                    minute=r_parts[0], hour=r_parts[1],
+                    day=r_parts[2], month=r_parts[3], day_of_week=r_parts[4],
+                ),
+                id=f"{config.agent_id}_research",
+                name=f"Research session {config.agent_id}",
+            )
+            logger.info(f"Scheduled research session: {config.agent_id} @ {r_cron}")
 
     return scheduler

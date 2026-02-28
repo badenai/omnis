@@ -6,13 +6,11 @@ from core.models.types import AgentConfig, AnalysisResult
 def _make_config():
     return AgentConfig(
         agent_id="test-agent",
-        mode="accumulate",
         model="gemini",
         analysis_mode="full_video",
         sources={"youtube_channels": [{"handle": "@TestChan", "check_schedule": "0 8 * * *"}]},
         consolidation_schedule="0 3 * * 0",
-        decay={"half_life_days": 365},
-    )
+        decay={"half_life_days": 365})
 
 
 def _make_result():
@@ -23,8 +21,7 @@ def _make_result():
         relevance_score=0.9,
         suggested_action="new_concept",
         suggested_target="new-concept",
-        raw_summary="summary",
-    )
+        raw_summary="summary")
 
 
 def test_run_collection_processes_new_videos(tmp_path, mocker):
@@ -62,16 +59,14 @@ def test_run_collection_uses_transcript_when_not_full_video(tmp_path, mocker):
     mock_provider.analyze_transcript.return_value = AnalysisResult(
         video_id="vid-t", video_title="T Video", insights=[],
         relevance_score=0.5, suggested_action="new_recent",
-        suggested_target="recent", raw_summary="",
-    )
+        suggested_target="recent", raw_summary="")
 
     config = AgentConfig(
-        agent_id="test", mode="accumulate", model="gemini",
+        agent_id="test", model="gemini",
         analysis_mode="transcript_only",
         sources={"youtube_channels": []},
         consolidation_schedule="0 3 * * 0",
-        decay={"half_life_days": 365},
-    )
+        decay={"half_life_days": 365})
     pipeline = CollectionPipeline(tmp_path, config, mock_provider, soul="soul")
     pipeline.run_collection("@TestChan")
 

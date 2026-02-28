@@ -8,13 +8,12 @@ from datetime import datetime, timezone
 
 def make_config(agent_id="test-agent"):
     return AgentConfig(
-        agent_id=agent_id, mode="accumulate", model="gemini",
+        agent_id=agent_id, model="gemini",
         analysis_mode="transcript_only",
         sources={"youtube_channels": [{"handle": "@Existing"}]},
         consolidation_schedule="0 3 * * 0",
         decay={"half_life_days": 365},
-        research={"enabled": True, "schedule": "0 10 * * *"},
-    )
+        research={"enabled": True, "schedule": "0 10 * * *"})
 
 
 def make_finding(title="Test Finding"):
@@ -22,16 +21,14 @@ def make_finding(title="Test Finding"):
         title=title, insights=["insight 1", "insight 2"],
         relevance_score=0.85, suggested_action="new_concept",
         suggested_target="test-finding", raw_summary="A test summary.",
-        sources_consulted=["https://example.com"],
-    )
+        sources_consulted=["https://example.com"])
 
 
 def make_source():
     return DiscoveredSource(
         url="https://youtube.com/@NewChannel", source_type="youtube_channel",
         handle="@NewChannel", rationale="Great content",
-        discovered_at=datetime.now(timezone.utc).isoformat(),
-    )
+        discovered_at=datetime.now(timezone.utc).isoformat())
 
 
 def test_research_session_writes_finding_to_inbox(tmp_path):
