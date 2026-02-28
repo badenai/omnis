@@ -18,7 +18,7 @@ export interface AgentResearch {
 
 export interface AgentSummary {
   agent_id: string;
-  mode: string;
+  mode?: string;
   model: string;
   analysis_mode: string;
   consolidation_schedule: string;
@@ -30,7 +30,7 @@ export interface AgentSummary {
 
 export interface AgentDetail {
   agent_id: string;
-  mode: string;
+  mode?: string;
   model: string;
   analysis_mode: string;
   sources: { youtube_channels?: ChannelSource[] };
@@ -48,7 +48,7 @@ export interface AgentDetail {
 
 export interface AgentConfigCreate {
   agent_id: string;
-  mode: string;
+  mode?: string;
   model: string;
   analysis_mode: string;
   sources: AgentSources;

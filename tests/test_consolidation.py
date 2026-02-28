@@ -38,8 +38,8 @@ def test_consolidation_generates_briefing_when_inbox_has_items(tmp_path, mocker)
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 
-    assert (tmp_path / "briefing.md").exists()
-    assert "# Briefing" in (tmp_path / "briefing.md").read_text()
+    assert (tmp_path / "memory.md").exists()
+    assert "# Briefing" in (tmp_path / "memory.md").read_text()
     mock_provider.generate_briefing.assert_called_once()
     mock_provider.generate_skill.assert_called_once()
 
@@ -93,7 +93,7 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     reloaded = fm.load(str(concepts_dir / "topic.md"))
     assert reloaded["relevance_score"] == 0.3
     # Outputs were generated
-    assert (tmp_path / "briefing.md").exists()
+    assert (tmp_path / "memory.md").exists()
     mock_provider.reevaluate_knowledge.assert_called_once()
     mock_provider.generate_briefing.assert_called_once()
     mock_provider.generate_skill.assert_called_once()

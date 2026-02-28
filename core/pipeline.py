@@ -50,7 +50,12 @@ class CollectionPipeline:
                             "Extract key insights relevant to this agent's domain.",
                         )
 
-                    inbox.append(channel_handle, result)
+                    if self._config.reflect_immediately:
+                        from core.micro_consolidation import MicroConsolidation
+                        mc = MicroConsolidation(self._dir, self._config, self._provider, self._soul)
+                        mc.run(item=result.raw_summary)
+                    else:
+                        inbox.append(channel_handle, result)
                     state.mark_processed(vid_id)
                     logger.info(f"Processed {vid_id} (relevance: {result.relevance_score})")
                 except Exception as e:

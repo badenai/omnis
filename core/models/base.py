@@ -18,3 +18,9 @@ class KnowledgeProvider(Protocol):
     def consolidate(
         self, inbox_items: list[str], existing_index: str, soul: str
     ) -> ConsolidationResult: ...
+
+    def stream_query(
+        self, system_prompt: str, message: str, history: list[dict]
+    ):
+        """Yields string tokens. history items: {"role": "user"|"model", "content": str}"""
+        ...

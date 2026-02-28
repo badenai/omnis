@@ -27,8 +27,8 @@ from yt_dlp.utils import DownloadError
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
-WORKSPACE = pathlib.Path.home() / ".cloracle"
-AGENTS_DIR = WORKSPACE / "agents"
+from core.constants import DATA_DIR
+AGENTS_DIR = DATA_DIR / "agents"
 
 
 def _get_agents(request: Request) -> dict:

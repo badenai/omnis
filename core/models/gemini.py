@@ -196,16 +196,18 @@ class GeminiProvider:
             pass
         return AnalysisResult(**self._parse_result(response.text))
 
-    def generate_briefing(self, knowledge_files: list[dict], soul: str, mode: str) -> str:
+    def generate_briefing(self, knowledge_files: list[dict], soul: str, mode: str = "") -> str:
         files_text = "\n\n---\n\n".join(
             f"# {f['path']}\n{f['content']}" for f in knowledge_files
         )
         contents = (
-            f"AGENT SOUL:\n{soul}\n\nMode: {mode}\n\n"
+            f"AGENT SOUL:\n{soul}\n\n"
             f"Based on the following knowledge files (sorted by effective_weight descending), "
-            f"write a comprehensive briefing document in Markdown. Structure:\n"
-            f"- For 'accumulate': Core Concepts -> Strategies -> Implementation Guidance\n"
-            f"- For 'watch': Recent Developments -> Trends -> Opportunity Suggestions\n\n"
+            f"write a comprehensive memory document in Markdown. Structure:\n"
+            f"## Core Knowledge (by weight)\n"
+            f"## Recent Developments (last 30 days)\n"
+            f"## Open Questions / Counter-Evidence\n\n"
+            f"Where possible, include inline source references like [topic](concepts/topic.md).\n\n"
             f"KNOWLEDGE FILES:\n{files_text}"
         )
         return self._generate(contents, model=self._consolidation_model_name)
@@ -511,3 +513,22 @@ class GeminiProvider:
             validation_summary=summary,
             searched_at=datetime.now(timezone.utc).isoformat(),
         )
+
+    def stream_query(self, system_prompt: str, message: str, history: list[dict]):
+        """Yields string tokens from a streaming Gemini chat."""
+        from google.genai import types as gtypes
+
+        contents = []
+        for h in history:
+            role = "user" if h.get("role") == "user" else "model"
+            contents.append(gtypes.Content(role=role, parts=[gtypes.Part(text=h["content"])]))
+        contents.append(gtypes.Content(role="user", parts=[gtypes.Part(text=message)]))
+
+        response = self._client.models.generate_content_stream(
+            model=self._consolidation_model_name,
+            contents=contents,
+            config=gtypes.GenerateContentConfig(system_instruction=system_prompt),
+        )
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text

@@ -8,14 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.agent_loader import load_agent
+from core.constants import APP_NAME, DATA_DIR
 from core.scheduler import build_scheduler
 from core.scheduler_instance import set_scheduler, get_scheduler
-from api.routers import agents, scheduler, knowledge
+from api.routers import agents, scheduler, knowledge, query
 
 logger = logging.getLogger(__name__)
 
-WORKSPACE = pathlib.Path.home() / ".cloracle"
-AGENTS_DIR = WORKSPACE / "agents"
+AGENTS_DIR = DATA_DIR / "agents"
 
 
 @asynccontextmanager
@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Cloracle", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title=APP_NAME.capitalize(), version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -69,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(scheduler.router)
     app.include_router(knowledge.router)
+    app.include_router(query.router)
 
     # Serve frontend build if it exists
     dist_dir = pathlib.Path(__file__).resolve().parent.parent / "web" / "dist"

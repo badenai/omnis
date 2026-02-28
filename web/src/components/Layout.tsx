@@ -31,7 +31,7 @@ export default function Layout() {
         <div className="flex-1" />
         <ActivityPanel />
       </nav>
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-hidden flex flex-col">
         <Outlet />
       </main>
     </div>
