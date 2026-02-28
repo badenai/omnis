@@ -3,7 +3,7 @@ import shutil
 import pathlib
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile, File, Form
 
 from core.config import load_agent_config, load_soul, save_agent_config, save_soul
 from core.agent_loader import load_agent
@@ -17,8 +17,11 @@ from api.schemas import (
     AgentConfigUpdate,
     AgentDetail,
     AgentSummary,
+    IngestChannelExecuteRequest,
+    IngestUrlRequest,
     SoulUpdate,
 )
+from core.collector import get_channel_videos
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -242,3 +245,70 @@ def delete_agent(agent_id: str, request: Request):
     # Remove directory
     shutil.rmtree(agent_dir)
     logger.info(f"Deleted agent: {agent_id}")
+
+
+@router.post("/{agent_id}/ingest/url", status_code=202)
+def ingest_url(
+    agent_id: str,
+    body: IngestUrlRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, detail=f"Agent '{agent_id}' not found")
+    pipeline = agents[agent_id].get("ingestion")
+    if not pipeline:
+        raise HTTPException(500, detail="Ingestion pipeline not available")
+    background_tasks.add_task(pipeline.run_url, body.url, body.title)
+    return {"status": "queued", "agent_id": agent_id, "url": body.url}
+
+
+@router.post("/{agent_id}/ingest/file", status_code=202)
+async def ingest_file(
+    agent_id: str,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    file: UploadFile = File(...),
+    title: str | None = Form(None),
+):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, detail=f"Agent '{agent_id}' not found")
+    pipeline = agents[agent_id].get("ingestion")
+    if not pipeline:
+        raise HTTPException(500, detail="Ingestion pipeline not available")
+    file_bytes = await file.read()
+    mime_type = file.content_type or "application/octet-stream"
+    background_tasks.add_task(pipeline.run_file, file_bytes, mime_type, file.filename, title)
+    return {"status": "queued", "agent_id": agent_id, "filename": file.filename}
+
+
+@router.post("/{agent_id}/ingest/channel/preview")
+def ingest_channel_preview(
+    agent_id: str,
+    body: IngestChannelExecuteRequest,
+    request: Request,
+):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, detail=f"Agent '{agent_id}' not found")
+    videos = get_channel_videos(body.url)
+    return {"count": len(videos), "videos": videos}
+
+
+@router.post("/{agent_id}/ingest/channel/execute", status_code=202)
+def ingest_channel_execute(
+    agent_id: str,
+    body: IngestChannelExecuteRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, detail=f"Agent '{agent_id}' not found")
+    pipeline = agents[agent_id].get("ingestion")
+    if not pipeline:
+        raise HTTPException(500, detail="Ingestion pipeline not available")
+    background_tasks.add_task(pipeline.run_channel, body.url, body.limit)
+    return {"status": "queued", "agent_id": agent_id, "url": body.url}

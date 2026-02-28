@@ -78,6 +78,16 @@ class AgentDetail(BaseModel):
     knowledge_count: int = 0
 
 
+class IngestUrlRequest(BaseModel):
+    url: str
+    title: str | None = None
+
+
+class IngestChannelExecuteRequest(BaseModel):
+    url: str
+    limit: int | None = None
+
+
 class JobInfo(BaseModel):
     id: str
     name: str
