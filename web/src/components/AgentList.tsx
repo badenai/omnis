@@ -29,7 +29,6 @@ export default function AgentList() {
             <thead className="bg-gray-900 text-gray-400">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Agent</th>
-                <th className="text-left px-4 py-3 font-medium">Mode</th>
                 <th className="text-left px-4 py-3 font-medium">Model</th>
                 <th className="text-right px-4 py-3 font-medium">Channels</th>
                 <th className="text-right px-4 py-3 font-medium">Inbox</th>
@@ -44,11 +43,6 @@ export default function AgentList() {
                     <Link to={`/agents/${a.agent_id}`} className="text-indigo-400 hover:text-indigo-300 font-medium">
                       {a.agent_id}
                     </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${a.mode === 'accumulate' ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'}`}>
-                      {a.mode}
-                    </span>
                   </td>
                   <td className="px-4 py-3 text-gray-400">{a.model}</td>
                   <td className="px-4 py-3 text-right text-gray-400">{a.channel_count}</td>

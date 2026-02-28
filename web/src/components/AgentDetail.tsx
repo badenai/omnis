@@ -34,7 +34,7 @@ export default function AgentDetail() {
         <div>
           <h2 className="text-xl font-semibold text-white">{agent.agent_id}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            {agent.model} &middot; {agent.sources.youtube_channels?.length ?? 0} channels
+            {agent.model} &middot; {(agent.sources.youtube_channels?.length ?? 0)} sources
           </p>
         </div>
 
