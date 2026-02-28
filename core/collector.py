@@ -9,8 +9,8 @@ _CHANNEL_PATTERN = re.compile(
 
 
 def is_channel_url(url: str) -> bool:
-    """Return True if url is a YouTube channel URL, False for video URLs."""
-    return bool(_CHANNEL_PATTERN.search(url))
+    """Return True if url points to a YouTube channel (not a video)."""
+    return bool(_CHANNEL_PATTERN.search(url.split("?")[0]))
 
 
 def get_channel_videos(url: str, limit: int | None = None) -> list[dict]:
@@ -30,7 +30,7 @@ def get_channel_videos(url: str, limit: int | None = None) -> list[dict]:
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
-    entries = info.get("entries", []) if info else []
+    entries = info.get("entries") or [] if info else []
     result = []
     for entry in entries:
         if not entry.get("id"):

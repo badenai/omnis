@@ -57,7 +57,7 @@ def test_get_channel_videos_returns_id_title_description(mocker):
     ]
     mock_ydl = mocker.MagicMock()
     mock_ydl.extract_info.return_value = {"entries": fake_entries}
-    mocker.patch("yt_dlp.YoutubeDL", return_value=mocker.MagicMock(
+    mocker.patch("core.collector.yt_dlp.YoutubeDL", return_value=mocker.MagicMock(
         __enter__=mocker.MagicMock(return_value=mock_ydl),
         __exit__=mocker.MagicMock(return_value=False),
     ))
@@ -76,7 +76,7 @@ def test_get_channel_videos_respects_limit(mocker):
         ctx.__enter__ = mocker.MagicMock(return_value=mock_ydl)
         ctx.__exit__ = mocker.MagicMock(return_value=False)
         return ctx
-    mocker.patch("yt_dlp.YoutubeDL", side_effect=fake_ydl_init)
+    mocker.patch("core.collector.yt_dlp.YoutubeDL", side_effect=fake_ydl_init)
     get_channel_videos("https://www.youtube.com/@test", limit=25)
     assert captured_opts.get("playlistend") == 25
 
@@ -90,6 +90,23 @@ def test_get_channel_videos_no_limit_no_playlistend(mocker):
         ctx.__enter__ = mocker.MagicMock(return_value=mock_ydl)
         ctx.__exit__ = mocker.MagicMock(return_value=False)
         return ctx
-    mocker.patch("yt_dlp.YoutubeDL", side_effect=fake_ydl_init)
+    mocker.patch("core.collector.yt_dlp.YoutubeDL", side_effect=fake_ydl_init)
     get_channel_videos("https://www.youtube.com/@test")
     assert "playlistend" not in captured_opts
+
+
+def test_get_channel_videos_handles_none_entries(mocker):
+    mock_ydl = mocker.MagicMock()
+    mock_ydl.extract_info.return_value = {"entries": None}
+    def fake_ydl_init(opts):
+        ctx = mocker.MagicMock()
+        ctx.__enter__ = mocker.MagicMock(return_value=mock_ydl)
+        ctx.__exit__ = mocker.MagicMock(return_value=False)
+        return ctx
+    mocker.patch("core.collector.yt_dlp.YoutubeDL", side_effect=fake_ydl_init)
+    result = get_channel_videos("https://www.youtube.com/@test")
+    assert result == []
+
+
+def test_is_channel_url_rejects_embedded_channel_in_query():
+    assert is_channel_url("https://www.youtube.com/watch?v=abc&next=youtube.com/@foo") is False
