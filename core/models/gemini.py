@@ -145,6 +145,57 @@ class GeminiProvider:
         data = self._parse_result(self._generate(contents))
         return AnalysisResult(**data)
 
+    def analyze_web_content(
+        self, url: str, text: str, title: str, soul: str
+    ) -> AnalysisResult:
+        """Analyze scraped webpage text."""
+        contents = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"TASK: Extract key insights relevant to this agent's domain.\n"
+            f"{_ANALYSIS_SCHEMA}\n"
+            f"SOURCE URL: {url}\n"
+            f"TITLE: {title}\n\n"
+            f"PAGE CONTENT:\n{text[:12000]}"
+        )
+        raw = self._generate(contents, model=self._model_name)
+        return AnalysisResult(**self._parse_result(raw))
+
+    def analyze_uploaded_file(
+        self, file_bytes: bytes, mime_type: str, title: str, soul: str
+    ) -> AnalysisResult:
+        """Upload binary file to Gemini Files API and analyze it."""
+        import io
+        import time
+        file_ref = self._client.files.upload(
+            file=io.BytesIO(file_bytes),
+            config={"mime_type": mime_type, "display_name": title},
+        )
+        # Files start in PROCESSING state — poll until ACTIVE before use.
+        for _ in range(30):
+            info = self._client.files.get(name=file_ref.name)
+            if info.state.name == "ACTIVE":
+                break
+            if info.state.name == "FAILED":
+                raise RuntimeError(f"Gemini file processing failed for {title!r}")
+            time.sleep(2)
+        else:
+            raise RuntimeError(f"Timed out waiting for Gemini file {file_ref.name} to become ACTIVE")
+        prompt = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"TASK: Extract key insights from this file relevant to this agent's domain.\n"
+            f"{_ANALYSIS_SCHEMA}\n"
+            f"FILE TITLE: {title}"
+        )
+        response = self._client.models.generate_content(
+            model=self._model_name,
+            contents=[file_ref, prompt],
+        )
+        try:
+            self._client.files.delete(name=file_ref.name)
+        except Exception:
+            pass
+        return AnalysisResult(**self._parse_result(response.text))
+
     def generate_briefing(self, knowledge_files: list[dict], soul: str, mode: str) -> str:
         files_text = "\n\n---\n\n".join(
             f"# {f['path']}\n{f['content']}" for f in knowledge_files
@@ -230,6 +281,24 @@ class GeminiProvider:
                 created.append(target)
             decisions.append(ConsolidationDecision(inbox_index=idx, action=action, target=target))
         return ConsolidationResult(updated_files=updated, created_files=created, decisions=decisions)
+
+    def screen_videos(self, videos: list[dict], soul: str) -> list[str]:
+        if not videos:
+            return []
+        videos_text = "\n\n".join(
+            f"ID: {v['id']}\nTitle: {v['title']}\nDescription: {v['description'][:200]}"
+            for v in videos
+        )
+        prompt = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"VIDEOS TO SCREEN:\n{videos_text}\n\n"
+            f"Which of these videos are relevant to the agent's soul and worth analyzing? "
+            f"Respond with valid JSON only, no markdown fences:\n"
+            f'{{\"relevant_ids\": [\"<id>\", ...]}}'
+        )
+        raw = self._generate(prompt)
+        data = self._parse_result(raw)
+        return data.get("relevant_ids", [])
 
     def reevaluate_knowledge(self, files: list[dict], soul: str) -> dict[str, float]:
         if not files:
