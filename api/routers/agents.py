@@ -22,6 +22,7 @@ from api.schemas import (
     SoulUpdate,
 )
 from core.collector import get_channel_videos
+from yt_dlp.utils import DownloadError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -293,7 +294,10 @@ def ingest_channel_preview(
     agents = _get_agents(request)
     if agent_id not in agents:
         raise HTTPException(404, detail=f"Agent '{agent_id}' not found")
-    videos = get_channel_videos(body.url)
+    try:
+        videos = get_channel_videos(body.url, body.limit)
+    except DownloadError as exc:
+        raise HTTPException(422, detail=f"Could not fetch channel: {exc}")
     return {"count": len(videos), "videos": videos}
 
 
