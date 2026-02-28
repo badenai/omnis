@@ -1,4 +1,5 @@
 import json
+import pytest
 from unittest.mock import MagicMock, patch
 from core.models.gemini import GeminiProvider
 from core.models.types import AnalysisResult
@@ -122,9 +123,10 @@ def test_analyze_uploaded_file_calls_files_api():
 
 
 def test_screen_videos_returns_relevant_ids(mocker):
-    from core.models.gemini import GeminiProvider
-    provider = GeminiProvider(api_key="fake")
-    mocker.patch.object(provider, "_generate", return_value='{"relevant_ids": ["abc", "xyz"]}')
+    mock_client = _make_mock_client('{"relevant_ids": ["abc", "xyz"]}')
+    mocker.patch("core.models.gemini.genai.Client", return_value=mock_client)
+
+    provider = GeminiProvider(api_key="fake-key")
     videos = [
         {"id": "abc", "title": "Relevant Video", "description": ""},
         {"id": "def", "title": "Unrelated Video", "description": ""},
@@ -133,17 +135,31 @@ def test_screen_videos_returns_relevant_ids(mocker):
     result = provider.screen_videos(videos, soul="AI research")
     assert result == ["abc", "xyz"]
 
+
 def test_screen_videos_empty_input_returns_empty(mocker):
-    from core.models.gemini import GeminiProvider
-    provider = GeminiProvider(api_key="fake")
-    mock_gen = mocker.patch.object(provider, "_generate")
+    mock_client = _make_mock_client("")
+    mocker.patch("core.models.gemini.genai.Client", return_value=mock_client)
+
+    provider = GeminiProvider(api_key="fake-key")
     result = provider.screen_videos([], soul="AI research")
     assert result == []
-    mock_gen.assert_not_called()
+    mock_client.models.generate_content.assert_not_called()
+
 
 def test_screen_videos_missing_key_returns_empty(mocker):
-    from core.models.gemini import GeminiProvider
-    provider = GeminiProvider(api_key="fake")
-    mocker.patch.object(provider, "_generate", return_value='{"other_key": []}')
+    mock_client = _make_mock_client('{"other_key": []}')
+    mocker.patch("core.models.gemini.genai.Client", return_value=mock_client)
+
+    provider = GeminiProvider(api_key="fake-key")
     result = provider.screen_videos([{"id": "a", "title": "T", "description": ""}], soul="AI")
     assert result == []
+
+
+def test_screen_videos_bad_json_raises(mocker):
+    import json
+    mock_client = _make_mock_client("not json")
+    mocker.patch("core.models.gemini.genai.Client", return_value=mock_client)
+
+    provider = GeminiProvider(api_key="fake-key")
+    with pytest.raises(json.JSONDecodeError):
+        provider.screen_videos([{"id": "a", "title": "T", "description": ""}], soul="AI")
