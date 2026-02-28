@@ -1,5 +1,6 @@
 import pathlib
 import logging
+from core.constants import DATA_DIR
 from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
 from core.registry import Registry
@@ -53,9 +54,9 @@ class ConsolidationPipeline:
 
             knowledge_files = kw.load_all_weighted()
 
-            job_status.update_step(agent_id, task, "Generating briefing.md...")
+            job_status.update_step(agent_id, task, "Generating memory.md...")
             briefing = self._provider.generate_briefing(knowledge_files, self._soul, self._config.mode)
-            (self._dir / "briefing.md").write_text(briefing, encoding="utf-8")
+            (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
             skill_content = self._provider.generate_skill(
@@ -64,7 +65,7 @@ class ConsolidationPipeline:
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
 
-            reg = Registry(pathlib.Path.home() / ".cloracle" / "registry.json")
+            reg = Registry(DATA_DIR / "registry.json")
             reg.register(
                 self._config.agent_id,
                 self._dir / "SKILL.md",
@@ -109,16 +110,16 @@ class ConsolidationPipeline:
 
             knowledge_files = kw.load_all_weighted()
 
-            job_status.update_step(agent_id, task, "Generating briefing.md...")
+            job_status.update_step(agent_id, task, "Generating memory.md...")
             briefing = self._provider.generate_briefing(knowledge_files, self._soul, self._config.mode)
-            (self._dir / "briefing.md").write_text(briefing, encoding="utf-8")
+            (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
             skill_content = self._provider.generate_skill(briefing, self._soul, self._config.agent_id)
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
 
-            reg = Registry(pathlib.Path.home() / ".cloracle" / "registry.json")
+            reg = Registry(DATA_DIR / "registry.json")
             reg.register(self._config.agent_id, self._dir / "SKILL.md", self._config.mode)
             reg.save()
 
@@ -152,9 +153,9 @@ class ConsolidationPipeline:
             job_status.update_step(agent_id, task, f"Searching for counter-evidence on {len(top_files)} files...")
             result = self._provider.validate_thesis(top_files, self._soul)
 
-            briefing_path = self._dir / "briefing.md"
-            existing = briefing_path.read_text(encoding="utf-8") if briefing_path.exists() else ""
-            briefing_path.write_text(existing + "\n\n" + self._format_validation_section(result), encoding="utf-8")
+            memory_path = self._dir / "memory.md"
+            existing = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
+            memory_path.write_text(existing + "\n\n" + self._format_validation_section(result), encoding="utf-8")
 
             logger.info(f"[{agent_id}] Thesis validation: {len(result.flagged_files)} flag(s)")
             job_status.complete(agent_id, task)

@@ -25,8 +25,8 @@ def test_validation_appends_to_briefing(tmp_path):
     config = make_config()
     provider = MagicMock()
     provider.validate_thesis.return_value = make_validation_result()
-    briefing = tmp_path / "briefing.md"
-    briefing.write_text("# Original Briefing\n", encoding="utf-8")
+    memory = tmp_path / "memory.md"
+    memory.write_text("# Original Briefing\n", encoding="utf-8")
 
     pipeline = ConsolidationPipeline(tmp_path, config, provider, "soul")
     with patch("core.consolidation.KnowledgeWriter") as MockKW:
@@ -35,7 +35,7 @@ def test_validation_appends_to_briefing(tmp_path):
         ]
         pipeline.run_thesis_validation()
 
-    content = briefing.read_text(encoding="utf-8")
+    content = memory.read_text(encoding="utf-8")
     assert "Thesis Validation" in content
     assert "One issue found." in content
     assert "[HIGH]" in content
