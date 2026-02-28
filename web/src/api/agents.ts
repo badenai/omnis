@@ -14,6 +14,7 @@ export function useAgent(id: string) {
     queryKey: ['agents', id],
     queryFn: () => apiFetch<AgentDetail>(`/agents/${id}`),
     enabled: !!id,
+    refetchInterval: 5000,
   });
 }
 
@@ -55,5 +56,58 @@ export function useDeleteAgent() {
     mutationFn: (id: string) =>
       apiFetch<void>(`/agents/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['agents'] }),
+  });
+}
+
+export function useIngestUrl(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ url, title }: { url: string; title?: string }) =>
+      apiFetch(`/agents/${agentId}/ingest/url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, title }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
+export function useIngestFile(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, title }: { file: File; title?: string }) => {
+      const form = new FormData();
+      form.append('file', file);
+      if (title) form.append('title', title);
+      return fetch(`/api/agents/${agentId}/ingest/file`, { method: 'POST', body: form }).then(
+        async (res) => {
+          if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+          return res.json();
+        }
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
+export function useChannelPreview(agentId: string) {
+  return useMutation({
+    mutationFn: (url: string) =>
+      apiFetch<{ count: number; videos: { id: string; title: string; description: string }[] }>(
+        `/agents/${agentId}/ingest/channel/preview`,
+        { method: 'POST', body: JSON.stringify({ url }) }
+      ),
+  });
+}
+
+export function useChannelExecute(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ url, limit }: { url: string; limit: number | null }) =>
+      apiFetch(`/agents/${agentId}/ingest/channel/execute`, {
+        method: 'POST',
+        body: JSON.stringify({ url, limit }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
 }
