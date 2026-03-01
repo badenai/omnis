@@ -39,7 +39,7 @@ export function parseInboxItem(raw: string): InboxItem {
     .filter((l) => l.trim().startsWith('- '))
     .map((l) => l.replace(/^-\s*/, '').trim());
 
-  const summaryMatch = raw.match(/###\s+Summary\n([\s\S]*?)$/);
+  const summaryMatch = raw.match(/###\s+Summary\n([\s\S]*?)(?=###|$)/);
   const summary = summaryMatch?.[1]?.trim() ?? '';
 
   return { timestamp, channel, videoId, title, relevanceScore, suggestedAction, suggestedTarget, insights, summary, raw };
@@ -64,13 +64,8 @@ interface CardProps {
 function InboxCard({ item }: CardProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const formattedTime = (() => {
-    try {
-      return new Date(item.timestamp).toLocaleString();
-    } catch {
-      return item.timestamp;
-    }
-  })();
+  const d = new Date(item.timestamp);
+  const formattedTime = isNaN(d.getTime()) ? item.timestamp : d.toLocaleString();
 
   return (
     <div
@@ -228,8 +223,8 @@ export default function InboxPanel({ agentId }: Props) {
 
   return (
     <div className="space-y-3">
-      {items.map((item, i) => (
-        <InboxCard key={i} item={item} />
+      {items.map((item) => (
+        <InboxCard key={item.videoId} item={item} />
       ))}
     </div>
   );
