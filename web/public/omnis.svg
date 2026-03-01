@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="5%" stop-color="#818cf8" />
+      <stop offset="35%" stop-color="#4f7fff" />
+      <stop offset="80%" stop-color="#2d4d99" />
+      <stop offset="100%" stop-color="#2a2a32" />
+    </linearGradient>
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="24" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <ellipse cx="256" cy="256" rx="110" ry="140" stroke="url(#ringGrad)" stroke-width="95" />
+  </g>
+</svg>

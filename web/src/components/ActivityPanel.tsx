@@ -19,14 +19,19 @@ function taskLabel(job: JobActivity): string {
 
 function ActiveJob({ job }: { job: JobActivity }) {
   return (
-    <div className="flex items-start gap-2 py-2">
-      <span className="mt-0.5 shrink-0 w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+    <div className="flex items-start gap-2 py-1.5">
+      <span
+        className="mt-0.5 shrink-0 w-1.5 h-1.5 rounded-full animate-pulse"
+        style={{ backgroundColor: 'var(--color-status-active)' }}
+      />
       <div className="min-w-0">
-        <div className="text-xs font-medium text-gray-200 truncate">
+        <div className="text-xs font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
           {job.agent_id} / {taskLabel(job)}
         </div>
-        <div className="text-xs text-gray-400 truncate">{job.step}</div>
-        <div className="text-xs text-gray-600">{elapsed(job.started_at)} ago</div>
+        <div className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{job.step}</div>
+        <div className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
+          {elapsed(job.started_at)} ago
+        </div>
       </div>
     </div>
   );
@@ -35,21 +40,24 @@ function ActiveJob({ job }: { job: JobActivity }) {
 function HistoryJob({ job }: { job: JobActivity }) {
   const ok = job.state === 'completed';
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <span className={`mt-0.5 shrink-0 text-xs ${ok ? 'text-green-500' : 'text-red-500'}`}>
+    <div className="flex items-start gap-2 py-1">
+      <span
+        className="mt-0.5 shrink-0 text-xs"
+        style={{ color: ok ? 'var(--color-status-ok)' : 'var(--color-status-error)' }}
+      >
         {ok ? '✓' : '✗'}
       </span>
       <div className="min-w-0">
-        <div className="text-xs text-gray-400 truncate">
+        <div className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
           {job.agent_id} / {taskLabel(job)}
           {job.finished_at && (
-            <span className="text-gray-600 ml-1">
+            <span className="ml-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
               ({duration(job.started_at, job.finished_at)})
             </span>
           )}
         </div>
         {!ok && job.error && (
-          <div className="text-xs text-red-400 truncate">{job.error}</div>
+          <div className="text-xs truncate" style={{ color: 'var(--color-status-error)' }}>{job.error}</div>
         )}
       </div>
     </div>
@@ -61,19 +69,35 @@ export default function ActivityPanel() {
   const active = data?.active ?? [];
   const history = data?.history ?? [];
 
-  if (active.length === 0 && history.length === 0) return null;
+  if (active.length === 0 && history.length === 0) {
+    return (
+      <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+        No recent activity
+      </div>
+    );
+  }
 
   return (
-    <div className="border-t border-gray-800 p-3">
+    <div>
       {active.length > 0 && (
         <div className="mb-2">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Running</div>
+          <div
+            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-1"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
+          >
+            Running
+          </div>
           {active.map((job) => <ActiveJob key={job.key} job={job} />)}
         </div>
       )}
       {history.length > 0 && (
         <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Recent</div>
+          <div
+            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-1"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
+          >
+            Recent
+          </div>
           {history.slice(0, 8).map((job) => <HistoryJob key={`${job.key}-${job.finished_at}`} job={job} />)}
         </div>
       )}

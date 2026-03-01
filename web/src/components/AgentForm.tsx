@@ -9,6 +9,72 @@ interface Props {
   agent?: AgentDetail;
 }
 
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  backgroundColor: 'var(--color-surface-2)',
+  border: '1px solid var(--color-border-default)',
+  borderRadius: '8px',
+  padding: '8px 12px',
+  fontSize: '13px',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  transition: 'border-color 0.15s',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: '10px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--color-text-muted)',
+  display: 'block',
+  marginBottom: '6px',
+  fontWeight: 500,
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function StyledInput(props: React.InputHTMLAttributes<HTMLInputElement> & { mono?: boolean }) {
+  const { mono, ...rest } = props;
+  return (
+    <input
+      {...rest}
+      style={{ ...inputStyle, fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; props.onFocus?.(e); }}
+      onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; props.onBlur?.(e); }}
+    />
+  );
+}
+
+function StyledSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      style={{ ...inputStyle, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; props.onFocus?.(e); }}
+      onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; props.onBlur?.(e); }}
+    />
+  );
+}
+
+function StyledTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      {...props}
+      style={{ ...inputStyle, fontFamily: 'var(--font-mono)', resize: 'vertical' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; props.onFocus?.(e); }}
+      onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; props.onBlur?.(e); }}
+    />
+  );
+}
+
 export default function AgentForm({ agent }: Props) {
   const isEdit = !!agent;
   const navigate = useNavigate();
@@ -38,7 +104,10 @@ export default function AgentForm({ agent }: Props) {
     setMessage('');
 
     try {
-      const research = { schedule: researchSchedule };
+      const research = {
+        schedule: researchSchedule,
+        enabled: agent?.research?.enabled ?? false
+      };
       if (isEdit) {
         await updateConfig.mutateAsync({
           model,
@@ -74,83 +143,65 @@ export default function AgentForm({ agent }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
+    <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
       {!isEdit && (
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Agent ID</label>
-          <input
+        <Field label="Agent ID">
+          <StyledInput
             type="text"
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
             required
             pattern="[a-z0-9\-]+"
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
             placeholder="my-agent-name"
+            mono
           />
-        </div>
+        </Field>
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Model</label>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-          >
+        <Field label="Model">
+          <StyledSelect value={model} onChange={(e) => setModel(e.target.value)}>
             <option value="gemini">gemini</option>
             <option value="openai">openai</option>
             <option value="claude">claude</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Analysis Mode</label>
-          <select
-            value={analysisMode}
-            onChange={(e) => setAnalysisMode(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-          >
+          </StyledSelect>
+        </Field>
+        <Field label="Analysis Mode">
+          <StyledSelect value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value)}>
             <option value="transcript_only">transcript_only</option>
             <option value="full_video">full_video</option>
-          </select>
-        </div>
+          </StyledSelect>
+        </Field>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Collection Model</label>
-          <input
+        <Field label="Collection Model">
+          <StyledInput
             type="text"
             value={collectionModel}
             onChange={(e) => setCollectionModel(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+            mono
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Consolidation Model</label>
-          <input
+        </Field>
+        <Field label="Consolidation Model">
+          <StyledInput
             type="text"
             value={consolidationModel}
             onChange={(e) => setConsolidationModel(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
+            mono
           />
-        </div>
+        </Field>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1">YouTube Channels</label>
+      <Field label="YouTube Channels">
         <ChannelList channels={channels} onChange={setChannels} />
-      </div>
+      </Field>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1">Consolidation Schedule</label>
+      <Field label="Consolidation Schedule">
         <CronInput value={consolidationSchedule} onChange={setConsolidationSchedule} />
-      </div>
+      </Field>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1">
-          Decay Half-Life: {halfLife} days
-        </label>
+      <Field label={`Decay Half-Life: ${halfLife} days`}>
         <input
           type="range"
           min={30}
@@ -159,36 +210,39 @@ export default function AgentForm({ agent }: Props) {
           onChange={(e) => setHalfLife(Number(e.target.value))}
           className="w-full"
         />
-      </div>
+      </Field>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-400 mb-1">Research Schedule</label>
+      <Field label="Research Schedule">
         <CronInput value={researchSchedule} onChange={setResearchSchedule} />
-      </div>
+      </Field>
 
       {!isEdit && (
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">Soul (SOUL.md)</label>
-          <textarea
+        <Field label="Soul (SOUL.md)">
+          <StyledTextarea
             value={soul}
             onChange={(e) => setSoul(e.target.value)}
             rows={8}
-            className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
             placeholder="Agent personality and instructions..."
           />
-        </div>
+        </Field>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-1">
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded text-sm font-medium transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent-dim)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent)')}
         >
           {saving ? 'Saving...' : isEdit ? 'Save Config' : 'Create Agent'}
         </button>
         {message && (
-          <span className={`text-sm ${message.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+          <span
+            className="text-sm"
+            style={{ color: message.startsWith('Error') ? 'var(--color-status-error)' : 'var(--color-status-ok)' }}
+          >
             {message}
           </span>
         )}

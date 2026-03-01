@@ -2,11 +2,64 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+
+  /* Surfaces */
+  --color-surface-0: #080809;
+  --color-surface-1: #0d0d0f;
+  --color-surface-2: #131316;
+  --color-surface-3: #1a1a1e;
+  --color-surface-4: #222228;
+
+  /* Borders */
+  --color-border-subtle: #1e1e24;
+  --color-border-default: #2a2a32;
+  --color-border-strong: #3a3a46;
+
+  /* Text */
+  --color-text-primary: #f0f0f4;
+  --color-text-secondary: #8a8a9a;
+  --color-text-muted: #52525e;
+  --color-text-disabled: #36363f;
+
+  /* Accent */
+  --color-accent: #4f7fff;
+  --color-accent-dim: #2d4d99;
+  --color-accent-glow: rgba(79, 127, 255, 0.12);
+
+  /* Status */
+  --color-status-active: #3b82f6;
+  --color-status-ok: #22c55e;
+  --color-status-warn: #f59e0b;
+  --color-status-error: #ef4444;
+  --color-status-idle: #52525e;
 }
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100 font-sans antialiased;
+    background-color: var(--color-surface-0);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-default);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
   }
 }
