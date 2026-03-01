@@ -7,6 +7,7 @@ import StatusPanel from './StatusPanel';
 import KnowledgeBrowser from './KnowledgeBrowser';
 import ChatPanel from './ChatPanel';
 import IngestPanel from './IngestPanel';
+import InboxPanel from './InboxPanel';
 
 const sectionHeading: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
@@ -25,6 +26,7 @@ export default function AgentDetail() {
   const deleteAgent = useDeleteAgent();
   const [viewMode, setViewMode] = useState<'chat' | 'manage'>('chat');
   const [showIngest, setShowIngest] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64" style={{ color: 'var(--color-text-muted)' }}>
@@ -162,7 +164,7 @@ export default function AgentDetail() {
                   style={{ backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)' }}
                 >
                   <div style={sectionHeading}>Status & Telemetry</div>
-                  <StatusPanel agent={agent} />
+                  <StatusPanel agent={agent} onOpenInbox={() => setShowInbox(true)} />
                 </div>
 
                 <div
@@ -224,6 +226,52 @@ export default function AgentDetail() {
                     </button>
                   </div>
                   <IngestPanel agent={agent} />
+                </div>
+              </div>
+            )}
+
+            {/* Slide-over for Inbox */}
+            {showInbox && (
+              <div
+                className="fixed inset-0 z-40 flex justify-end"
+                style={{ backgroundColor: 'rgba(8,8,9,0.7)' }}
+                onClick={(e) => { if (e.target === e.currentTarget) setShowInbox(false); }}
+              >
+                <div
+                  className="w-full max-w-md h-full p-6 overflow-y-auto animate-in slide-in-from-right duration-300"
+                  style={{ backgroundColor: 'var(--color-surface-1)', borderLeft: '1px solid var(--color-border-subtle)' }}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        Inbox
+                      </h3>
+                      {agent.inbox_count > 0 && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--color-status-warn)',
+                            backgroundColor: 'rgba(234,179,8,0.15)',
+                          }}
+                        >
+                          {agent.inbox_count}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowInbox(false)}
+                      className="p-1.5 rounded-lg transition-colors"
+                      style={{ color: 'var(--color-text-muted)' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-3)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <InboxPanel agentId={agent.agent_id} />
                 </div>
               </div>
             )}
