@@ -8,9 +8,10 @@ import type { AgentDetail } from '../types';
 
 interface Props {
   agent: AgentDetail;
+  onOpenInbox?: () => void;
 }
 
-export default function StatusPanel({ agent }: Props) {
+export default function StatusPanel({ agent, onOpenInbox }: Props) {
   const { data: jobs } = useJobs();
   const triggerCollection = useTriggerCollection(agent.agent_id);
   const triggerConsolidation = useTriggerConsolidation(agent.agent_id);
@@ -88,18 +89,36 @@ export default function StatusPanel({ agent }: Props) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-3">
-        <div
-          className="rounded-lg px-4 py-3"
-          style={{ backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}
-        >
-          <div style={monoLabel}>Inbox Items</div>
-          <div
-            className="text-2xl font-medium leading-none"
-            style={{ fontFamily: 'var(--font-mono)', color: agent.inbox_count > 0 ? 'var(--color-status-warn)' : 'var(--color-text-primary)' }}
+        {onOpenInbox ? (
+          <button
+            onClick={onOpenInbox}
+            className="rounded-lg px-4 py-3 text-left w-full transition-colors"
+            style={{ backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', cursor: 'pointer' }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-3)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-2)')}
           >
-            {agent.inbox_count}
+            <div style={monoLabel}>Inbox Items</div>
+            <div
+              className="text-2xl font-medium leading-none"
+              style={{ fontFamily: 'var(--font-mono)', color: agent.inbox_count > 0 ? 'var(--color-status-warn)' : 'var(--color-text-primary)' }}
+            >
+              {agent.inbox_count}
+            </div>
+          </button>
+        ) : (
+          <div
+            className="rounded-lg px-4 py-3"
+            style={{ backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}
+          >
+            <div style={monoLabel}>Inbox Items</div>
+            <div
+              className="text-2xl font-medium leading-none"
+              style={{ fontFamily: 'var(--font-mono)', color: agent.inbox_count > 0 ? 'var(--color-status-warn)' : 'var(--color-text-primary)' }}
+            >
+              {agent.inbox_count}
+            </div>
           </div>
-        </div>
+        )}
         <div
           className="rounded-lg px-4 py-3"
           style={{ backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}
