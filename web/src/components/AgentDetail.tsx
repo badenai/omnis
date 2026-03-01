@@ -204,6 +204,7 @@ export default function AgentDetail() {
               <div
                 className="fixed inset-0 z-40 flex justify-end"
                 style={{ backgroundColor: 'rgba(8,8,9,0.7)' }}
+                onClick={(e) => { if (e.target === e.currentTarget) setShowIngest(false); }}
               >
                 <div
                   className="w-full max-w-md h-full p-6 overflow-y-auto animate-in slide-in-from-right duration-300"

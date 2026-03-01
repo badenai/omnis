@@ -193,7 +193,10 @@ interface Props {
 
 export default function InboxPanel({ agentId }: Props) {
   const { data, isLoading } = useInbox(agentId);
-  const items = (data?.items ?? []).map(parseInboxItem).reverse(); // newest first
+  const items = (data?.items ?? [])
+    .map(parseInboxItem)
+    .filter((item) => item.videoId !== '' || item.title !== '' || item.timestamp !== '')
+    .reverse(); // newest first
 
   if (isLoading) {
     return (
@@ -224,7 +227,7 @@ export default function InboxPanel({ agentId }: Props) {
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <InboxCard key={item.videoId} item={item} />
+        <InboxCard key={`${item.videoId}-${item.timestamp}`} item={item} />
       ))}
     </div>
   );
