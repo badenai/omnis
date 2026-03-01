@@ -64,6 +64,4 @@ class AgentConfig:
     decay: dict
     collection_model: str = "gemini-3-flash-preview"
     consolidation_model: str = "gemini-3.1-pro-preview"
-    research: dict = field(default_factory=dict)
-    reflect_immediately: bool = False
-    # Shape: {"enabled": bool, "schedule": "cron string"}
+    self_improving: bool = True

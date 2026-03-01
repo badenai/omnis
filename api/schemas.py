@@ -3,7 +3,6 @@ from pydantic import BaseModel
 
 class ChannelSource(BaseModel):
     handle: str
-    check_schedule: str = "0 8 * * *"
 
 
 class AgentSources(BaseModel):
@@ -12,10 +11,6 @@ class AgentSources(BaseModel):
 
 class AgentDecay(BaseModel):
     half_life_days: int = 365
-
-
-class AgentResearch(BaseModel):
-    schedule: str = "0 10 * * *"
 
 
 class AgentConfigCreate(BaseModel):
@@ -28,7 +23,7 @@ class AgentConfigCreate(BaseModel):
     collection_model: str = "gemini-3-flash-preview"
     consolidation_model: str = "gemini-3.1-pro-preview"
     soul: str = ""
-    research: AgentResearch = AgentResearch()
+    self_improving: bool = True
 
 
 class AgentConfigUpdate(BaseModel):
@@ -39,7 +34,7 @@ class AgentConfigUpdate(BaseModel):
     decay: AgentDecay | None = None
     collection_model: str | None = None
     consolidation_model: str | None = None
-    research: AgentResearch | None = None
+    self_improving: bool | None = None
 
 
 class SoulUpdate(BaseModel):
@@ -55,6 +50,7 @@ class AgentSummary(BaseModel):
     last_consolidation: str | None = None
     inbox_count: int = 0
     knowledge_count: int = 0
+    self_improving: bool = True
 
 
 class AgentDetail(BaseModel):
@@ -67,7 +63,7 @@ class AgentDetail(BaseModel):
     collection_model: str
     consolidation_model: str
     soul: str
-    research: dict = {}
+    self_improving: bool = True
     last_checked: dict = {}
     last_consolidation: str | None = None
     inbox_count: int = 0

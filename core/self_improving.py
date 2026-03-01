@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 _DISCOVERED_SOURCES_FILE = "discovered_sources.md"
 
 
-class ResearchSession:
+class SelfImprovingSession:
     def __init__(self, agent_dir: pathlib.Path, config: AgentConfig, provider, soul: str):
         self._dir = agent_dir
         self._config = config
@@ -20,8 +20,8 @@ class ResearchSession:
 
     def run(self) -> None:
         agent_id = self._config.agent_id
-        task = "research"
-        job_status.start(agent_id, task, "Preparing research context...")
+        task = "self-improving"
+        job_status.start(agent_id, task, "Preparing self-improving context...")
 
         try:
             index_path = self._dir / "knowledge" / "_index.md"
@@ -36,7 +36,7 @@ class ResearchSession:
             )
 
             if not findings:
-                logger.info("Research session returned no findings.")
+                logger.info("Self-improving session returned no findings.")
                 job_status.complete(agent_id, task)
                 return
 
@@ -48,15 +48,16 @@ class ResearchSession:
             if new_sources:
                 job_status.update_step(agent_id, task, f"Logging {len(new_sources)} discovered sources...")
                 self._log_discovered_sources(new_sources)
+                self._auto_add_sources(new_sources)
 
             logger.info(
-                f"[{agent_id}] Research session complete: "
+                f"[{agent_id}] Self-improving session complete: "
                 f"{len(findings)} findings, {len(new_sources)} new sources"
             )
             job_status.complete(agent_id, task)
 
         except Exception as e:
-            logger.error(f"[{agent_id}] Research session failed: {e}")
+            logger.error(f"[{agent_id}] Self-improving session failed: {e}")
             job_status.fail(agent_id, task, str(e))
             raise
 
@@ -71,7 +72,7 @@ class ResearchSession:
         return "\n".join(lines) if lines else "None yet."
 
     def _append_finding_to_inbox(self, inbox: InboxWriter, finding: ResearchFinding) -> None:
-        pseudo_id = f"research-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        pseudo_id = f"self-improving-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
         result = AnalysisResult(
             video_id=pseudo_id,
             video_title=finding.title,
@@ -81,7 +82,7 @@ class ResearchSession:
             suggested_target=finding.suggested_target,
             raw_summary=finding.raw_summary,
         )
-        inbox.append("autonomous-research", result)
+        inbox.append("self-improving", result)
 
     def _log_discovered_sources(self, sources: list[DiscoveredSource]) -> None:
         dest = self._dir / _DISCOVERED_SOURCES_FILE
@@ -96,3 +97,26 @@ class ResearchSession:
                 f"- **Rationale:** {s.rationale}\n"
             )
         dest.write_text(existing + "\n".join(new_entries), encoding="utf-8")
+
+    def _auto_add_sources(self, sources: list[DiscoveredSource]) -> None:
+        """Add newly discovered YouTube channels to agent config (disk + memory)."""
+        if not sources:
+            return
+        existing_handles = {
+            ch["handle"]
+            for ch in self._config.sources.get("youtube_channels", [])
+        }
+        added = []
+        for s in sources:
+            if s.source_type == "youtube_channel" and s.handle and s.handle not in existing_handles:
+                self._config.sources.setdefault("youtube_channels", []).append({"handle": s.handle})
+                existing_handles.add(s.handle)
+                added.append(s.handle)
+        if added:
+            import yaml
+            from core.config import save_agent_config
+            config_path = self._dir / "config.yaml"
+            raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            raw["sources"] = self._config.sources
+            save_agent_config(config_path, raw)
+            logger.info(f"[{self._config.agent_id}] Auto-added {len(added)} sources: {added}")

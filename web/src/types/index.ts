@@ -1,6 +1,5 @@
 export interface ChannelSource {
   handle: string;
-  check_schedule: string;
 }
 
 export interface AgentSources {
@@ -9,11 +8,6 @@ export interface AgentSources {
 
 export interface AgentDecay {
   half_life_days: number;
-}
-
-export interface AgentResearch {
-  enabled: boolean;
-  schedule: string;
 }
 
 export interface AgentSummary {
@@ -25,6 +19,7 @@ export interface AgentSummary {
   last_consolidation: string | null;
   inbox_count: number;
   knowledge_count: number;
+  self_improving: boolean;
 }
 
 export interface AgentDetail {
@@ -37,7 +32,7 @@ export interface AgentDetail {
   collection_model: string;
   consolidation_model: string;
   soul: string;
-  research?: AgentResearch;
+  self_improving: boolean;
   last_checked: Record<string, string>;
   last_consolidation: string | null;
   inbox_count: number;
@@ -54,7 +49,7 @@ export interface AgentConfigCreate {
   collection_model: string;
   consolidation_model: string;
   soul: string;
-  research?: AgentResearch;
+  self_improving: boolean;
 }
 
 export interface AgentConfigUpdate {
@@ -65,7 +60,7 @@ export interface AgentConfigUpdate {
   decay?: AgentDecay;
   collection_model?: string;
   consolidation_model?: string;
-  research?: AgentResearch;
+  self_improving?: boolean;
 }
 
 export interface JobInfo {

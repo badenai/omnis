@@ -52,6 +52,7 @@ def _agent_summary(agent: dict) -> AgentSummary:
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
         knowledge_count=len(knowledge_files),
+        self_improving=config.self_improving,
     )
 
 
@@ -73,7 +74,7 @@ def _agent_detail(agent: dict) -> AgentDetail:
         collection_model=config.collection_model,
         consolidation_model=config.consolidation_model,
         soul=agent["soul"],
-        research=config.research,
+        self_improving=config.self_improving,
         last_checked=state.last_checked,
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
@@ -133,7 +134,7 @@ def create_agent(body: AgentConfigCreate, request: Request):
         "decay": body.decay.model_dump(),
         "collection_model": body.collection_model,
         "consolidation_model": body.consolidation_model,
-        "research": body.research.model_dump(),
+        "self_improving": body.self_improving,
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
     save_soul(agent_dir, body.soul)
@@ -177,7 +178,7 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
         "decay": body.decay.model_dump() if body.decay is not None else config.decay,
         "collection_model": body.collection_model if body.collection_model is not None else config.collection_model,
         "consolidation_model": body.consolidation_model if body.consolidation_model is not None else config.consolidation_model,
-        "research": body.research.model_dump() if body.research is not None else config.research,
+        "self_improving": body.self_improving if body.self_improving is not None else config.self_improving,
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
 

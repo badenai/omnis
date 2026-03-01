@@ -23,7 +23,7 @@ def test_load_soul_missing_returns_empty(tmp_path):
     assert soul == ""
 
 
-def test_load_config_reads_research_block(tmp_path):
+def test_load_config_reads_self_improving(tmp_path):
     yaml_content = """\
 agent_id: test-agent
 mode: accumulate
@@ -33,16 +33,14 @@ sources: {}
 consolidation_schedule: "0 3 * * 0"
 decay:
   half_life_days: 365
-research:
-  enabled: true
-  schedule: "0 10 * * *"
+self_improving: false
 """
     (tmp_path / "config.yaml").write_text(yaml_content)
     config = load_agent_config(tmp_path / "config.yaml")
-    assert config.research == {"enabled": True, "schedule": "0 10 * * *"}
+    assert config.self_improving is False
 
 
-def test_load_config_defaults_research_to_empty(tmp_path):
+def test_load_config_defaults_self_improving_to_true(tmp_path):
     yaml_content = """\
 agent_id: test-agent
 mode: accumulate
@@ -54,4 +52,4 @@ decay: {}
 """
     (tmp_path / "config.yaml").write_text(yaml_content)
     config = load_agent_config(tmp_path / "config.yaml")
-    assert config.research == {}
+    assert config.self_improving is True

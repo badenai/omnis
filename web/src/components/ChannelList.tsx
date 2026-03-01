@@ -6,11 +6,11 @@ interface Props {
 }
 
 export default function ChannelList({ channels, onChange }: Props) {
-  const add = () => onChange([...channels, { handle: '', check_schedule: '0 8 * * *' }]);
+  const add = () => onChange([...channels, { handle: '' }]);
 
-  const update = (i: number, field: keyof ChannelSource, value: string) => {
+  const update = (i: number, value: string) => {
     const next = [...channels];
-    next[i] = { ...next[i], [field]: value };
+    next[i] = { handle: value };
     onChange(next);
   };
 
@@ -23,16 +23,9 @@ export default function ChannelList({ channels, onChange }: Props) {
           <input
             type="text"
             value={ch.handle}
-            onChange={(e) => update(i, 'handle', e.target.value)}
+            onChange={(e) => update(i, e.target.value)}
             placeholder="@ChannelHandle"
             className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-          />
-          <input
-            type="text"
-            value={ch.check_schedule}
-            onChange={(e) => update(i, 'check_schedule', e.target.value)}
-            placeholder="0 8 * * *"
-            className="w-40 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
           />
           <button
             type="button"

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  useTriggerCollection, useTriggerConsolidation, useTriggerReevaluation,
-  useTriggerResearch, useDiscoveredSources,
+  useTriggerCollection, useTriggerRun, useTriggerReevaluation,
+  useDiscoveredSources,
 } from '../api/scheduler';
 import { useJobs } from '../api/scheduler';
 import type { AgentDetail } from '../types';
@@ -14,9 +14,8 @@ interface Props {
 export default function StatusPanel({ agent, onOpenInbox }: Props) {
   const { data: jobs } = useJobs();
   const triggerCollection = useTriggerCollection(agent.agent_id);
-  const triggerConsolidation = useTriggerConsolidation(agent.agent_id);
+  const triggerRun = useTriggerRun(agent.agent_id);
   const triggerReevaluation = useTriggerReevaluation(agent.agent_id);
-  const triggerResearch = useTriggerResearch(agent.agent_id);
   const { data: discoveredSources } = useDiscoveredSources(agent.agent_id);
   const [message, setMessage] = useState('');
 
@@ -33,11 +32,11 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
     }
   };
 
-  const handleConsolidate = async () => {
+  const handleRun = async () => {
     setMessage('');
     try {
-      await triggerConsolidation.mutateAsync();
-      setMessage('Triggered consolidation');
+      await triggerRun.mutateAsync();
+      setMessage('Triggered full run');
     } catch (err) {
       setMessage(`Error: ${(err as Error).message}`);
     }
@@ -48,16 +47,6 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
     try {
       await triggerReevaluation.mutateAsync();
       setMessage('Triggered reevaluation');
-    } catch (err) {
-      setMessage(`Error: ${(err as Error).message}`);
-    }
-  };
-
-  const handleResearch = async () => {
-    setMessage('');
-    try {
-      await triggerResearch.mutateAsync();
-      setMessage('Triggered research session');
     } catch (err) {
       setMessage(`Error: ${(err as Error).message}`);
     }
@@ -207,14 +196,14 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
             </div>
             <div className="flex flex-col gap-2">
               <button
-                onClick={handleConsolidate}
-                disabled={triggerConsolidation.isPending}
+                onClick={handleRun}
+                disabled={triggerRun.isPending}
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50"
                 style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent-dim)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent)')}
               >
-                {triggerConsolidation.isPending ? 'Triggering...' : 'Run Consolidation Now'}
+                {triggerRun.isPending ? 'Triggering...' : 'Run Now'}
               </button>
               <button
                 onClick={handleReevaluate}
@@ -225,16 +214,6 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(109,40,217,0.3)')}
               >
                 {triggerReevaluation.isPending ? 'Triggering...' : 'Reevaluate Now'}
-              </button>
-              <button
-                onClick={handleResearch}
-                disabled={triggerResearch.isPending}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50"
-                style={{ backgroundColor: 'rgba(5,150,105,0.25)', color: '#6ee7b7', border: '1px solid rgba(5,150,105,0.35)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(5,150,105,0.4)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(5,150,105,0.25)')}
-              >
-                {triggerResearch.isPending ? 'Triggering...' : 'Research Now'}
               </button>
             </div>
           </div>

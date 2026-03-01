@@ -29,6 +29,15 @@ export function useActivity() {
   });
 }
 
+export function useTriggerRun(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/scheduler/trigger/${agentId}/run`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
 export function useTriggerCollection(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -38,29 +47,11 @@ export function useTriggerCollection(agentId: string) {
   });
 }
 
-export function useTriggerConsolidation(agentId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      apiFetch(`/scheduler/trigger/${agentId}/consolidate`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
-  });
-}
-
 export function useTriggerReevaluation(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
       apiFetch(`/scheduler/trigger/${agentId}/reevaluate`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
-  });
-}
-
-export function useTriggerResearch(agentId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      apiFetch(`/scheduler/trigger/${agentId}/research`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
 }

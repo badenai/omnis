@@ -61,11 +61,12 @@ def _fetch_web_text(url: str) -> tuple[str, str]:
 
 
 class ManualIngestionPipeline:
-    def __init__(self, agent_dir: pathlib.Path, config: AgentConfig, provider, soul: str):
+    def __init__(self, agent_dir: pathlib.Path, config: AgentConfig, provider, soul: str, consolidation_pipeline=None):
         self._dir = agent_dir
         self._config = config
         self._provider = provider
         self._soul = soul
+        self._consolidation = consolidation_pipeline
 
     def run_url(self, url: str, title: str | None = None) -> None:
         agent_id = self._config.agent_id
@@ -97,6 +98,8 @@ class ManualIngestionPipeline:
 
             InboxWriter(self._dir).append("manual", result)
             logger.info(f"[{agent_id}] Ingested URL: {url} (relevance={result.relevance_score})")
+            if self._consolidation:
+                self._consolidation.run()
             job_status.complete(agent_id, task)
         except Exception as e:
             logger.error(f"[{agent_id}] URL ingestion failed: {e}")
@@ -148,6 +151,8 @@ class ManualIngestionPipeline:
                 state.mark_processed(v["id"])
             state.save()
 
+            if self._consolidation:
+                self._consolidation.run()
             job_status.complete(agent_id, task)
         except Exception as e:
             logger.error(f"[{agent_id}] Channel scan failed: {e}")
@@ -164,6 +169,8 @@ class ManualIngestionPipeline:
             result = self._provider.analyze_uploaded_file(file_bytes, mime_type, display, self._soul)
             InboxWriter(self._dir).append("manual", result)
             logger.info(f"[{agent_id}] Ingested file: {filename} (relevance={result.relevance_score})")
+            if self._consolidation:
+                self._consolidation.run()
             job_status.complete(agent_id, task)
         except Exception as e:
             logger.error(f"[{agent_id}] File ingestion failed: {e}")

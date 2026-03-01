@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request
 
 from core.scheduler_instance import get_scheduler
+from core.scheduler import _run_daily
 from core import job_status
 from api.schemas import JobInfo
 
@@ -21,6 +22,27 @@ def list_jobs():
     return jobs
 
 
+@router.post("/trigger/{agent_id}/run")
+def trigger_run(agent_id: str, request: Request):
+    agents = request.app.state.agents
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+
+    agent = agents[agent_id]
+    scheduler = get_scheduler()
+
+    scheduler.add_job(
+        _run_daily,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        args=[agent["collection"], agent["consolidation"], agent.get("self_improving")],
+        id=f"{agent_id}_manual_run_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Manual run {agent_id}",
+    )
+    logger.info(f"Triggered full daily run: {agent_id}")
+    return {"status": "triggered", "agent_id": agent_id}
+
+
 @router.post("/trigger/{agent_id}/collect/{handle}")
 def trigger_collection(agent_id: str, handle: str, request: Request):
     agents = request.app.state.agents
@@ -28,40 +50,24 @@ def trigger_collection(agent_id: str, handle: str, request: Request):
         raise HTTPException(404, f"Agent '{agent_id}' not found")
 
     agent = agents[agent_id]
-    pipeline = agent["collection"]
+    collection_pipeline = agent["collection"]
+    consolidation_pipeline = agent["consolidation"]
     scheduler = get_scheduler()
 
+    def _collect_and_consolidate(handle: str):
+        collection_pipeline.run_collection(handle)
+        consolidation_pipeline.run()
+
     scheduler.add_job(
-        pipeline.run_collection,
+        _collect_and_consolidate,
         trigger="date",
         run_date=datetime.now(timezone.utc),
         args=[handle],
         id=f"{agent_id}_{handle}_manual_{datetime.now(timezone.utc).timestamp():.0f}",
         name=f"Manual collect {handle} for {agent_id}",
     )
-    logger.info(f"Triggered collection: {agent_id} / {handle}")
+    logger.info(f"Triggered collection + consolidation: {agent_id} / {handle}")
     return {"status": "triggered", "agent_id": agent_id, "handle": handle}
-
-
-@router.post("/trigger/{agent_id}/consolidate")
-def trigger_consolidation(agent_id: str, request: Request):
-    agents = request.app.state.agents
-    if agent_id not in agents:
-        raise HTTPException(404, f"Agent '{agent_id}' not found")
-
-    agent = agents[agent_id]
-    pipeline = agent["consolidation"]
-    scheduler = get_scheduler()
-
-    scheduler.add_job(
-        pipeline.run,
-        trigger="date",
-        run_date=datetime.now(timezone.utc),
-        id=f"{agent_id}_manual_consolidate_{datetime.now(timezone.utc).timestamp():.0f}",
-        name=f"Manual consolidate {agent_id}",
-    )
-    logger.info(f"Triggered consolidation: {agent_id}")
-    return {"status": "triggered", "agent_id": agent_id}
 
 
 @router.post("/trigger/{agent_id}/reevaluate")
@@ -82,27 +88,6 @@ def trigger_reevaluation(agent_id: str, request: Request):
         name=f"Manual reevaluate {agent_id}",
     )
     logger.info(f"Triggered reevaluation: {agent_id}")
-    return {"status": "triggered", "agent_id": agent_id}
-
-
-@router.post("/trigger/{agent_id}/research")
-def trigger_research(agent_id: str, request: Request):
-    agents = request.app.state.agents
-    if agent_id not in agents:
-        raise HTTPException(404, f"Agent '{agent_id}' not found")
-    agent = agents[agent_id]
-    if "research" not in agent:
-        raise HTTPException(400, f"Agent '{agent_id}' has no research session")
-    session = agent["research"]
-    scheduler = get_scheduler()
-    scheduler.add_job(
-        session.run,
-        trigger="date",
-        run_date=datetime.now(timezone.utc),
-        id=f"{agent_id}_manual_research_{datetime.now(timezone.utc).timestamp():.0f}",
-        name=f"Manual research {agent_id}",
-    )
-    logger.info(f"Triggered research session: {agent_id}")
     return {"status": "triggered", "agent_id": agent_id}
 
 

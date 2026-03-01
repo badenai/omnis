@@ -93,7 +93,7 @@ export default function AgentForm({ agent }: Props) {
     agent?.consolidation_schedule ?? '0 3 * * 0'
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
-  const [researchSchedule, setResearchSchedule] = useState(agent?.research?.schedule ?? '0 10 * * *');
+  const [selfImproving, setSelfImproving] = useState(agent?.self_improving ?? true);
   const [soul, setSoul] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -104,10 +104,6 @@ export default function AgentForm({ agent }: Props) {
     setMessage('');
 
     try {
-      const research = {
-        schedule: researchSchedule,
-        enabled: agent?.research?.enabled ?? false
-      };
       if (isEdit) {
         await updateConfig.mutateAsync({
           model,
@@ -117,7 +113,7 @@ export default function AgentForm({ agent }: Props) {
           decay: { half_life_days: halfLife },
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
-          research,
+          self_improving: selfImproving,
         });
         setMessage('Config saved.');
       } else {
@@ -131,7 +127,7 @@ export default function AgentForm({ agent }: Props) {
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
           soul,
-          research,
+          self_improving: selfImproving,
         });
         navigate(`/agents/${agentId}`);
       }
@@ -212,8 +208,17 @@ export default function AgentForm({ agent }: Props) {
         />
       </Field>
 
-      <Field label="Research Schedule">
-        <CronInput value={researchSchedule} onChange={setResearchSchedule} />
+      <Field label="Self-Improving">
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={selfImproving}
+            onChange={(e) => setSelfImproving(e.target.checked)}
+          />
+          <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+            Run self-improving session after daily collection
+          </span>
+        </label>
       </Field>
 
       {!isEdit && (

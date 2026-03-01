@@ -28,13 +28,13 @@ def test_agent_config_defaults():
     assert cfg.agent_id == "test-agent"
 
 
-def test_agent_config_has_research_field():
+def test_agent_config_has_self_improving_field():
     config = AgentConfig(
         agent_id="test", model="gemini",
         analysis_mode="transcript_only",
         sources={}, consolidation_schedule="0 3 * * 0", decay={},
     )
-    assert config.research == {}
+    assert config.self_improving is True
 
 
 def test_research_finding_dataclass():
