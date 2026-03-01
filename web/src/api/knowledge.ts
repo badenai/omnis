@@ -26,18 +26,10 @@ export function useSkill(agentId: string) {
   });
 }
 
-export function useBriefing(agentId: string) {
+export function useDigest(agentId: string) {
   return useQuery({
-    queryKey: ['knowledge', agentId, 'briefing'],
-    queryFn: () => apiFetch<{ content: string }>(`/knowledge/${agentId}/briefing`),
-    enabled: !!agentId,
-  });
-}
-
-export function useMemory(agentId: string) {
-  return useQuery({
-    queryKey: ['knowledge', agentId, 'memory'],
-    queryFn: () => apiFetch<{ content: string }>(`/knowledge/${agentId}/memory`),
+    queryKey: ['knowledge', agentId, 'digest'],
+    queryFn: () => apiFetch<{ content: string }>(`/knowledge/${agentId}/digest`),
     enabled: !!agentId,
   });
 }

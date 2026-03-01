@@ -7,7 +7,7 @@ Omnis is a **knowledge agent system** that automatically learns about topics you
 1. Watches YouTube channels for new videos
 2. Reads and analyzes those videos to extract key insights
 3. Stores what it learns in organized knowledge files
-4. Consolidates that knowledge into a comprehensive briefing document
+4. Consolidates that knowledge into a comprehensive digest document
 5. Exports everything as a **SKILL.md file** you can inject into Claude Code
 
 **In one sentence:** Omnis watches channels you care about, extracts what matters to you specifically, and keeps your Claude sessions informed about it.
@@ -57,7 +57,7 @@ The weekly job that converts raw inbox items into organized knowledge. Steps:
 1. Read all items in INBOX.md
 2. Ask Gemini: "Should each item update an existing concept, create a new concept, or go in recent news?"
 3. Write/update the knowledge files accordingly
-4. Generate **briefing.md** (a human-readable executive summary)
+4. Generate **digest.md** (a human-readable executive summary)
 5. Generate **SKILL.md** (ready for Claude Code)
 6. Clear INBOX.md (start fresh next week)
 
@@ -74,15 +74,15 @@ Concretely, with a half-life of 365 days:
 - Day 365: weight = 0.9 × 0.5 = **0.45**
 - Day 730: weight = 0.9 × 0.25 = **0.23**
 
-Higher weight = appears higher in briefings and SKILL.md. Old knowledge doesn't disappear — it just becomes less prominent.
+Higher weight = appears higher in digests and SKILL.md. Old knowledge doesn't disappear — it just becomes less prominent.
 
-### briefing.md
+### digest.md
 An AI-generated executive summary of all weighted knowledge, structured by mode:
 - **accumulate:** Core Concepts → Strategies → Implementation Guidance
 - **watch:** Recent Developments → Trends → Opportunity Suggestions
 
 ### SKILL.md
-A Claude Code skill file — condensed, actionable knowledge from the briefing, formatted so Claude can use it as context. Written to two places:
+A Claude Code skill file — condensed, actionable knowledge from the digest, formatted so Claude can use it as context. Written to two places:
 - `~/.omnis/agents/<id>/SKILL.md` (your copy)
 - `~/.claude/plugins/cache/omnis/<id>/SKILL.md` (Claude Code picks this up automatically)
 
@@ -94,11 +94,11 @@ A Claude Code skill file — condensed, actionable knowledge from the briefing, 
 |---|---|---|
 | **Purpose** | Build deep expertise over time | Stay current on fast-moving topics |
 | **Focus** | Timeless concepts, patterns, theory | Breaking news, trends, announcements |
-| **briefing.md** | Concepts → Strategies → Implementation | Developments → Trends → Opportunities |
+| **digest.md** | Concepts → Strategies → Implementation | Developments → Trends → Opportunities |
 | **Ideal half-life** | 365+ days | 14–90 days |
 | **Use case** | "Learn price action trading deeply" | "Monitor AI releases and announcements" |
 
-Everything else — collection, inbox, knowledge files — works identically in both modes. The mode only changes how Gemini structures the final briefing and skill output, and you should set `half_life_days` to match.
+Everything else — collection, inbox, knowledge files — works identically in both modes. The mode only changes how Gemini structures the final digest and skill output, and you should set `half_life_days` to match.
 
 ---
 
@@ -125,8 +125,8 @@ Read INBOX.md (all week's raw entries)
       "update_concept" → merge into knowledge/concepts/filename.md
       "new_concept"    → create knowledge/concepts/filename.md
       "new_recent"     → create knowledge/recent/YYYY-MM/filename.md
-  → generate briefing.md from top weighted files
-  → generate SKILL.md from briefing
+  → generate digest.md from top weighted files
+  → generate SKILL.md from digest
   → update knowledge/_index.md (top 20 by weight)
   → clear INBOX.md
   → save last_consolidation timestamp
@@ -188,7 +188,7 @@ collection_model: "gemini-3-flash-preview"
 consolidation_model: "gemini-3.1-pro-preview"
 ```
 - `collection_model` — Used for transcript/video analysis. Called many times per run (once per video). Use a fast, cheap model.
-- `consolidation_model` — Used for consolidation decisions, briefing, and SKILL.md generation. Called rarely (3× per consolidation run). Use a smarter model for quality output.
+- `consolidation_model` — Used for consolidation decisions, digest, and SKILL.md generation. Called rarely (3× per consolidation run). Use a smarter model for quality output.
 
 ---
 
@@ -201,7 +201,7 @@ consolidation_model: "gemini-3.1-pro-preview"
   - **Config** — edit all settings, save live
   - **Soul** — edit SOUL.md in place
   - **Status** — channel last-checked times, trigger buttons, scheduled jobs
-  - **Knowledge** — browse knowledge files, search, read briefing/SKILL.md
+  - **Knowledge** — browse knowledge files, search, read digest/SKILL.md
 - **Sidebar activity panel** — live view of any running collection/consolidation with current step
 
 ### Via API
@@ -234,7 +234,7 @@ Everything lives in `~/.omnis/agents/<id>/`. Edit config.yaml or SOUL.md directl
 │       ├── SOUL.md            ← personality
 │       ├── state.json         ← processed video IDs + timestamps
 │       ├── INBOX.md           ← raw inbox (cleared weekly)
-│       ├── briefing.md        ← weekly executive summary
+│       ├── digest.md        ← weekly executive summary
 │       ├── SKILL.md           ← Claude Code skill
 │       └── knowledge/
 │           ├── _index.md      ← top 20 files by weight
@@ -252,7 +252,7 @@ Everything lives in `~/.omnis/agents/<id>/`. Edit config.yaml or SOUL.md directl
 
 After consolidation, SKILL.md lands at `~/.claude/plugins/cache/omnis/<agent-id>/SKILL.md`. Claude Code reads skills from this directory and can inject them as context into your conversations.
 
-The skill contains condensed, actionable knowledge from your briefing — whatever is most relevant based on effective weight. It's regenerated every consolidation cycle, so it stays current.
+The skill contains condensed, actionable knowledge from your digest — whatever is most relevant based on effective weight. It's regenerated every consolidation cycle, so it stays current.
 
 ---
 
@@ -264,6 +264,6 @@ The skill contains condensed, actionable knowledge from your briefing — whatev
 
 **Match half-life to content type.** Fast-moving spaces (AI news, crypto, markets) → short half-life (14–60 days). Deep technical knowledge (algorithms, architecture patterns) → long half-life (365+ days).
 
-**Watch mode + daily consolidation = news feed.** If you set consolidation_schedule to daily and half_life_days to 14, you get a fresh, up-to-date briefing every morning.
+**Watch mode + daily consolidation = news feed.** If you set consolidation_schedule to daily and half_life_days to 14, you get a fresh, up-to-date digest every morning.
 
 **The inbox is your draft pile.** If INBOX.md has lots of low-relevance entries (score < 0.3), your SOUL.md is probably too broad. Narrow it down to what you actually care about.

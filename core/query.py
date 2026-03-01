@@ -37,10 +37,7 @@ class QueryHandler:
         parts: list[str] = []
         sources: list[str] = []
 
-        # Always include working memory (memory.md, falling back to briefing.md)
-        memory_path = self._dir / "memory.md"
-        if not memory_path.exists():
-            memory_path = self._dir / "briefing.md"
+        memory_path = self._dir / "digest.md"
 
         if memory_path.exists():
             parts.append(memory_path.read_text(encoding="utf-8"))

@@ -196,14 +196,18 @@ class GeminiProvider:
             pass
         return AnalysisResult(**self._parse_result(response.text))
 
-    def generate_briefing(self, knowledge_files: list[dict], soul: str, mode: str = "") -> str:
+    def generate_digest(self, knowledge_files: list[dict], soul: str, mode: str = "") -> str:
+        from datetime import date
+        today = date.today().isoformat()
         files_text = "\n\n---\n\n".join(
             f"# {f['path']}\n{f['content']}" for f in knowledge_files
         )
         contents = (
             f"AGENT SOUL:\n{soul}\n\n"
             f"Based on the following knowledge files (sorted by effective_weight descending), "
-            f"write a comprehensive memory document in Markdown. Structure:\n"
+            f"write a comprehensive memory document in Markdown. Begin with the line:\n"
+            f"'*Knowledge last updated: {today}*'\n\n"
+            f"Then structure:\n"
             f"## Core Knowledge (by weight)\n"
             f"## Recent Developments (last 30 days)\n"
             f"## Open Questions / Counter-Evidence\n\n"
@@ -212,7 +216,7 @@ class GeminiProvider:
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
-    def generate_skill(self, briefing: str, soul: str, agent_id: str) -> str:
+    def generate_skill(self, digest: str, soul: str, agent_id: str) -> str:
         from datetime import date
         today = date.today().isoformat()
         contents = (
@@ -225,11 +229,13 @@ class GeminiProvider:
             f"Required sections:\n\n"
             f"1. YAML frontmatter with:\n"
             f"   name: {agent_id}\n"
-            f"   description: <one sentence — what situation triggers this skill>\n"
-            f"   last_updated: {today}\n\n"
+            f"   description: <'Use when [specific trigger conditions only]' — under 500 chars,\n"
+            f"                 no workflow summary, just the situations that activate this skill,\n"
+            f"                 third-person, never starts with 'I' or 'You'>\n\n"
             f"2. ## Overview\n"
             f"   One-sentence core principle. Then announce line:\n"
-            f"   'Announce at start: I am using the {agent_id} skill.'\n\n"
+            f"   'Announce at start: I am using the {agent_id} skill.'\n"
+            f"   Then: '*Knowledge last updated: {today}*'\n\n"
             f"3. ## When to Use\n"
             f"   Explicit trigger conditions as bullets. Include 'When NOT to use' if relevant.\n\n"
             f"4. ## The Iron Law\n"
@@ -247,8 +253,8 @@ class GeminiProvider:
             f"- Every sentence must be imperative or conditional, never descriptive\n"
             f"- Red flags must be realistic excuses, not generic ones\n"
             f"- Concise and scannable: Claude reads this before acting, not for research\n\n"
-            f"KNOWLEDGE BRIEFING (extract behavioral rules from this — do not summarize it):\n"
-            f"{briefing}"
+            f"KNOWLEDGE DIGEST (extract behavioral rules from this — do not summarize it):\n"
+            f"{digest}"
         )
         return self._generate(contents, model=self._consolidation_model_name)
 

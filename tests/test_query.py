@@ -15,17 +15,17 @@ def test_select_tier_recent_keywords():
     assert qh.select_tier("What happened recently in AI?") == 2
 
 
-def test_build_context_tier1_returns_soul_and_memory(tmp_path):
+def test_build_context_tier1_returns_soul_and_digest(tmp_path):
     from core.query import QueryHandler
     soul = "I am an expert."
-    (tmp_path / "memory.md").write_text("# Memory\nKey insight here.", encoding="utf-8")
+    (tmp_path / "digest.md").write_text("# Digest\nKey insight here.", encoding="utf-8")
     qh = QueryHandler(agent_dir=tmp_path, soul=soul)
     context, sources = qh.build_context(tier=1)
     assert "Key insight here." in context
-    assert sources == ["memory.md"]
+    assert sources == ["digest.md"]
 
 
-def test_build_context_tier1_falls_back_if_no_memory(tmp_path):
+def test_build_context_tier1_falls_back_if_no_digest(tmp_path):
     from core.query import QueryHandler
     qh = QueryHandler(agent_dir=tmp_path, soul="Expert.")
     context, sources = qh.build_context(tier=1)
@@ -38,8 +38,8 @@ def test_build_context_tier2_includes_recent_files(tmp_path):
     from datetime import datetime, timezone
     import frontmatter
 
-    # Write memory.md
-    (tmp_path / "memory.md").write_text("# Memory\nBase knowledge.", encoding="utf-8")
+    # Write digest.md
+    (tmp_path / "digest.md").write_text("# Digest\nBase knowledge.", encoding="utf-8")
 
     # Write a recent knowledge file dated today
     recent_dir = tmp_path / "knowledge" / "recent" / datetime.now(timezone.utc).strftime("%Y-%m")

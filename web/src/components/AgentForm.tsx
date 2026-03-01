@@ -3,7 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useCreateAgent, useUpdateConfig } from '../api/agents';
 import type { AgentDetail, ChannelSource } from '../types';
 import ChannelList from './ChannelList';
-import CronInput from './CronInput';
+import Tooltip from './Tooltip';
+
+function cronToTime(cron: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 2) return '03:00';
+  const min = parts[0].padStart(2, '0');
+  const hr = parts[1].padStart(2, '0');
+  return `${hr}:${min}`;
+}
+
+function timeToCron(time: string): string {
+  const [hr, min] = time.split(':');
+  return `${parseInt(min, 10)} ${parseInt(hr, 10)} * * *`;
+}
 
 interface Props {
   agent?: AgentDetail;
@@ -32,10 +45,14 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
 };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+
+function Field({ label, tooltip, children }: { label: string; tooltip?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={labelStyle}>{label}</label>
+      <label style={labelStyle}>
+        {label}
+        {tooltip && <Tooltip text={tooltip} />}
+      </label>
       {children}
     </div>
   );
@@ -89,8 +106,8 @@ export default function AgentForm({ agent }: Props) {
   const [channels, setChannels] = useState<ChannelSource[]>(
     agent?.sources.youtube_channels ?? []
   );
-  const [consolidationSchedule, setConsolidationSchedule] = useState(
-    agent?.consolidation_schedule ?? '0 3 * * 0'
+  const [runTime, setRunTime] = useState(
+    cronToTime(agent?.consolidation_schedule ?? '0 3 * * *')
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
   const [selfImproving, setSelfImproving] = useState(agent?.self_improving ?? true);
@@ -109,7 +126,7 @@ export default function AgentForm({ agent }: Props) {
           model,
           analysis_mode: analysisMode,
           sources: { youtube_channels: channels },
-          consolidation_schedule: consolidationSchedule,
+          consolidation_schedule: timeToCron(runTime),
           decay: { half_life_days: halfLife },
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
@@ -122,7 +139,7 @@ export default function AgentForm({ agent }: Props) {
           model,
           analysis_mode: analysisMode,
           sources: { youtube_channels: channels },
-          consolidation_schedule: consolidationSchedule,
+          consolidation_schedule: timeToCron(runTime),
           decay: { half_life_days: halfLife },
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
@@ -141,7 +158,7 @@ export default function AgentForm({ agent }: Props) {
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
       {!isEdit && (
-        <Field label="Agent ID">
+        <Field label="Agent ID" tooltip="Unique identifier for this agent. Lowercase letters, numbers, and dashes only. Used as the directory name on disk.">
           <StyledInput
             type="text"
             value={agentId}
@@ -155,14 +172,14 @@ export default function AgentForm({ agent }: Props) {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Model">
+        <Field label="Model" tooltip="AI provider used to analyze content. Only Gemini is fully supported right now.">
           <StyledSelect value={model} onChange={(e) => setModel(e.target.value)}>
             <option value="gemini">gemini</option>
             <option value="openai">openai</option>
             <option value="claude">claude</option>
           </StyledSelect>
         </Field>
-        <Field label="Analysis Mode">
+        <Field label="Analysis Mode" tooltip="transcript_only: downloads text captions and sends them to the model — fast and cheap. full_video: sends the YouTube URL directly to Gemini for native video understanding — better for visual content like charts or demos, but slower and more expensive.">
           <StyledSelect value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value)}>
             <option value="transcript_only">transcript_only</option>
             <option value="full_video">full_video</option>
@@ -171,7 +188,7 @@ export default function AgentForm({ agent }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Collection Model">
+        <Field label="Collection Model" tooltip="Model used to analyze each video or article. Called once per piece of content, so use a fast and cheap model (e.g. gemini-2.0-flash).">
           <StyledInput
             type="text"
             value={collectionModel}
@@ -179,7 +196,7 @@ export default function AgentForm({ agent }: Props) {
             mono
           />
         </Field>
-        <Field label="Consolidation Model">
+        <Field label="Consolidation Model" tooltip="Model used to organize knowledge, write the digest, and generate the skill file. Called only a few times per run, so use a smarter model for better quality output (e.g. gemini-2.5-pro).">
           <StyledInput
             type="text"
             value={consolidationModel}
@@ -189,15 +206,20 @@ export default function AgentForm({ agent }: Props) {
         </Field>
       </div>
 
-      <Field label="YouTube Channels">
+      <Field label="YouTube Channels" tooltip="List of YouTube channel @handles to watch. The agent fetches new videos from each channel on every daily run and skips ones it has already processed.">
         <ChannelList channels={channels} onChange={setChannels} />
       </Field>
 
-      <Field label="Consolidation Schedule">
-        <CronInput value={consolidationSchedule} onChange={setConsolidationSchedule} />
+      <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
+        <StyledInput
+          type="time"
+          value={runTime}
+          onChange={(e) => setRunTime(e.target.value)}
+          mono
+        />
       </Field>
 
-      <Field label={`Decay Half-Life: ${halfLife} days`}>
+      <Field label={`Decay Half-Life: ${halfLife} days`} tooltip="How long before a knowledge file loses half its importance. Short (30–90 days) for fast-moving topics like news. Long (365+ days) for timeless knowledge like techniques or theory. Set to 9999 for permanent.">
         <input
           type="range"
           min={30}
@@ -208,7 +230,7 @@ export default function AgentForm({ agent }: Props) {
         />
       </Field>
 
-      <Field label="Self-Improving">
+      <Field label="Self-Improving" tooltip="After the daily collection, the agent runs a web research session to find new sources and insights beyond its configured channels. Any discovered YouTube channels are automatically added to future runs.">
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             type="checkbox"
@@ -222,7 +244,7 @@ export default function AgentForm({ agent }: Props) {
       </Field>
 
       {!isEdit && (
-        <Field label="Soul (SOUL.md)">
+        <Field label="Soul (SOUL.md)" tooltip="The agent's personality and mission. Tells the AI what to pay attention to and what to ignore. This is the most important setting — it directly controls what gets collected and learned.">
           <StyledTextarea
             value={soul}
             onChange={(e) => setSoul(e.target.value)}

@@ -60,16 +60,13 @@ def read_skill(agent_id: str, request: Request):
     return {"content": skill_path.read_text(encoding="utf-8")}
 
 
-@router.get("/{agent_id}/memory")
-def read_memory(agent_id: str, request: Request):
+@router.get("/{agent_id}/digest")
+def read_digest(agent_id: str, request: Request):
     agent = _get_agent(agent_id, request)
-    memory_path = agent["dir"] / "memory.md"
-    # backward compat: fall back to old briefing.md
-    if not memory_path.exists():
-        memory_path = agent["dir"] / "briefing.md"
-    if not memory_path.exists():
-        raise HTTPException(404, "memory.md not found")
-    return {"content": memory_path.read_text(encoding="utf-8")}
+    digest_path = agent["dir"] / "digest.md"
+    if not digest_path.exists():
+        raise HTTPException(404, "digest.md not found")
+    return {"content": digest_path.read_text(encoding="utf-8")}
 
 
 @router.get("/{agent_id}/inbox")

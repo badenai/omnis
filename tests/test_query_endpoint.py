@@ -28,7 +28,7 @@ def _make_app(mocker, agent_dir, soul="Expert."):
 
 def test_query_endpoint_streams_tokens(tmp_path, mocker):
     app, provider = _make_app(mocker, tmp_path)
-    (tmp_path / "memory.md").write_text("# Memory\nTest knowledge.", encoding="utf-8")
+    (tmp_path / "digest.md").write_text("# Digest\nTest knowledge.", encoding="utf-8")
 
     client = TestClient(app, raise_server_exceptions=True)
     with client.stream(
@@ -45,7 +45,7 @@ def test_query_endpoint_streams_tokens(tmp_path, mocker):
 
 def test_query_endpoint_includes_sources(tmp_path, mocker):
     app, provider = _make_app(mocker, tmp_path)
-    (tmp_path / "memory.md").write_text("# Memory\nKnowledge here.", encoding="utf-8")
+    (tmp_path / "digest.md").write_text("# Digest\nKnowledge here.", encoding="utf-8")
 
     client = TestClient(app, raise_server_exceptions=True)
     with client.stream(
@@ -54,7 +54,7 @@ def test_query_endpoint_includes_sources(tmp_path, mocker):
     ) as r:
         body = b"".join(r.iter_bytes()).decode()
         assert '"sources"' in body
-        assert "memory.md" in body
+        assert "digest.md" in body
 
 
 def test_query_endpoint_404_for_unknown_agent(tmp_path, mocker):
@@ -69,7 +69,7 @@ def test_query_endpoint_404_for_unknown_agent(tmp_path, mocker):
 
 def test_query_endpoint_calls_provider_with_system_prompt(tmp_path, mocker):
     app, provider = _make_app(mocker, tmp_path, soul="Focus on trading.")
-    (tmp_path / "memory.md").write_text("# Memory\nTrading insights.", encoding="utf-8")
+    (tmp_path / "digest.md").write_text("# Digest\nTrading insights.", encoding="utf-8")
 
     client = TestClient(app, raise_server_exceptions=True)
     with client.stream(

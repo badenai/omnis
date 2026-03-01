@@ -5,6 +5,7 @@ import {
 } from '../api/scheduler';
 import { useJobs } from '../api/scheduler';
 import type { AgentDetail } from '../types';
+import Tooltip from './Tooltip';
 
 interface Props {
   agent: AgentDetail;
@@ -171,12 +172,13 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
                 <button
                   onClick={() => handleCollect(ch.handle)}
                   disabled={triggerCollection.isPending}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-2 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-2 disabled:opacity-50 flex items-center"
                   style={{ backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-default)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
                 >
                   Collect Now
+                  <Tooltip text="Fetch new videos from this channel, analyze them against the soul, and run consolidation to update the knowledge base." />
                 </button>
               </div>
             ))}
@@ -198,22 +200,24 @@ export default function StatusPanel({ agent, onOpenInbox }: Props) {
               <button
                 onClick={handleRun}
                 disabled={triggerRun.isPending}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50 flex items-center"
                 style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent-dim)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent)')}
               >
                 {triggerRun.isPending ? 'Triggering...' : 'Run Now'}
+                <Tooltip text="Run the full daily pipeline immediately: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled)." />
               </button>
               <button
                 onClick={handleReevaluate}
                 disabled={triggerReevaluation.isPending}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left disabled:opacity-50 flex items-center"
                 style={{ backgroundColor: 'rgba(109,40,217,0.3)', color: '#c4b5fd', border: '1px solid rgba(109,40,217,0.4)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(109,40,217,0.45)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(109,40,217,0.3)')}
               >
                 {triggerReevaluation.isPending ? 'Triggering...' : 'Reevaluate Now'}
+                <Tooltip text="Re-score all existing knowledge files using the current soul. Useful after editing the soul to reprioritize what the agent has already learned." />
               </button>
             </div>
           </div>

@@ -2,8 +2,8 @@ import pathlib
 import pytest
 
 
-def test_consolidation_writes_memory_md(tmp_path, mocker):
-    """Consolidation must write memory.md, not briefing.md."""
+def test_consolidation_writes_digest_md(tmp_path, mocker):
+    """Consolidation must write digest.md, not briefing.md."""
     from core.consolidation import ConsolidationPipeline
     from core.models.types import AgentConfig
 
@@ -14,7 +14,7 @@ def test_consolidation_writes_memory_md(tmp_path, mocker):
         decay={"half_life_days": 365})
     provider = mocker.MagicMock()
     provider.consolidate.return_value = mocker.MagicMock(decisions=[])
-    provider.generate_briefing.return_value = "# Memory\nTest content."
+    provider.generate_digest.return_value = "# Digest\nTest content."
     provider.generate_skill.return_value = "# Skill"
     provider.validate_thesis.side_effect = Exception("skip")
 
@@ -27,5 +27,5 @@ def test_consolidation_writes_memory_md(tmp_path, mocker):
     mocker.patch("core.consolidation.AgentState")
     pipeline.run()
 
-    assert (tmp_path / "memory.md").exists(), "memory.md must be written"
+    assert (tmp_path / "digest.md").exists(), "digest.md must be written"
     assert not (tmp_path / "briefing.md").exists(), "briefing.md must not be written"

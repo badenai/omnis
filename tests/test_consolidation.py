@@ -16,10 +16,10 @@ def test_consolidation_skips_when_inbox_empty(tmp_path):
     mock_provider = MagicMock()
     pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
     pipeline.run()
-    mock_provider.generate_briefing.assert_not_called()
+    mock_provider.generate_digest.assert_not_called()
 
 
-def test_consolidation_generates_briefing_when_inbox_has_items(tmp_path, mocker):
+def test_consolidation_generates_digest_when_inbox_has_items(tmp_path, mocker):
     (tmp_path / "INBOX.md").write_text("## entry\ncontent here")
     (tmp_path / "knowledge").mkdir()
     (tmp_path / "knowledge" / "_index.md").write_text("# Index")
@@ -28,7 +28,7 @@ def test_consolidation_generates_briefing_when_inbox_has_items(tmp_path, mocker)
     mock_provider.consolidate.return_value = ConsolidationResult(
         updated_files=[], created_files=[]
     )
-    mock_provider.generate_briefing.return_value = "# Briefing\nContent."
+    mock_provider.generate_digest.return_value = "# Digest\nContent."
     mock_provider.generate_skill.return_value = "---\nname: test\n---\n# Skill"
 
     with patch("core.consolidation.SkillWriter") as MockSW, \
@@ -37,9 +37,9 @@ def test_consolidation_generates_briefing_when_inbox_has_items(tmp_path, mocker)
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 
-    assert (tmp_path / "memory.md").exists()
-    assert "# Briefing" in (tmp_path / "memory.md").read_text()
-    mock_provider.generate_briefing.assert_called_once()
+    assert (tmp_path / "digest.md").exists()
+    assert "# Digest" in (tmp_path / "digest.md").read_text()
+    mock_provider.generate_digest.assert_called_once()
     mock_provider.generate_skill.assert_called_once()
 
 
@@ -49,7 +49,7 @@ def test_consolidation_clears_inbox_after_run(tmp_path, mocker):
 
     mock_provider = MagicMock()
     mock_provider.consolidate.return_value = ConsolidationResult(updated_files=[], created_files=[])
-    mock_provider.generate_briefing.return_value = "# Briefing"
+    mock_provider.generate_digest.return_value = "# Digest"
     mock_provider.generate_skill.return_value = "# Skill"
 
     with patch("core.consolidation.SkillWriter"), \
@@ -65,7 +65,7 @@ def test_reevaluation_skips_when_no_knowledge_files(tmp_path):
     pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
     pipeline.run_reevaluation()
     mock_provider.reevaluate_knowledge.assert_not_called()
-    mock_provider.generate_briefing.assert_not_called()
+    mock_provider.generate_digest.assert_not_called()
 
 
 def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
@@ -79,7 +79,7 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
 
     mock_provider = MagicMock()
     mock_provider.reevaluate_knowledge.return_value = {"concepts/topic.md": 0.3}
-    mock_provider.generate_briefing.return_value = "# Briefing\nContent."
+    mock_provider.generate_digest.return_value = "# Digest\nContent."
     mock_provider.generate_skill.return_value = "---\nname: test\n---\n# Skill"
 
     with patch("core.consolidation.SkillWriter") as MockSW, \
@@ -92,7 +92,7 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     reloaded = fm.load(str(concepts_dir / "topic.md"))
     assert reloaded["relevance_score"] == 0.3
     # Outputs were generated
-    assert (tmp_path / "memory.md").exists()
+    assert (tmp_path / "digest.md").exists()
     mock_provider.reevaluate_knowledge.assert_called_once()
-    mock_provider.generate_briefing.assert_called_once()
+    mock_provider.generate_digest.assert_called_once()
     mock_provider.generate_skill.assert_called_once()

@@ -54,13 +54,13 @@ class ConsolidationPipeline:
 
             knowledge_files = kw.load_all_weighted()
 
-            job_status.update_step(agent_id, task, "Generating memory.md...")
-            briefing = self._provider.generate_briefing(knowledge_files, self._soul)
-            (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
+            job_status.update_step(agent_id, task, "Generating digest.md...")
+            digest = self._provider.generate_digest(knowledge_files, self._soul)
+            (self._dir / "digest.md").write_text(digest, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
             skill_content = self._provider.generate_skill(
-                briefing, self._soul, self._config.agent_id
+                digest, self._soul, self._config.agent_id
             )
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
@@ -110,12 +110,12 @@ class ConsolidationPipeline:
 
             knowledge_files = kw.load_all_weighted()
 
-            job_status.update_step(agent_id, task, "Generating memory.md...")
-            briefing = self._provider.generate_briefing(knowledge_files, self._soul)
-            (self._dir / "memory.md").write_text(briefing, encoding="utf-8")
+            job_status.update_step(agent_id, task, "Generating digest.md...")
+            digest = self._provider.generate_digest(knowledge_files, self._soul)
+            (self._dir / "digest.md").write_text(digest, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
-            skill_content = self._provider.generate_skill(briefing, self._soul, self._config.agent_id)
+            skill_content = self._provider.generate_skill(digest, self._soul, self._config.agent_id)
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
 
@@ -137,7 +137,7 @@ class ConsolidationPipeline:
             raise
 
     def run_thesis_validation(self) -> None:
-        """Search for counter-evidence against current knowledge. Appends results to briefing.md."""
+        """Search for counter-evidence against current knowledge. Appends results to digest.md."""
         agent_id = self._config.agent_id
         task = "thesis-validation"
         job_status.start(agent_id, task, "Loading knowledge for thesis validation...")
@@ -153,9 +153,9 @@ class ConsolidationPipeline:
             job_status.update_step(agent_id, task, f"Searching for counter-evidence on {len(top_files)} files...")
             result = self._provider.validate_thesis(top_files, self._soul)
 
-            memory_path = self._dir / "memory.md"
-            existing = memory_path.read_text(encoding="utf-8") if memory_path.exists() else ""
-            memory_path.write_text(existing + "\n\n" + self._format_validation_section(result), encoding="utf-8")
+            digest_path = self._dir / "digest.md"
+            existing = digest_path.read_text(encoding="utf-8") if digest_path.exists() else ""
+            digest_path.write_text(existing + "\n\n" + self._format_validation_section(result), encoding="utf-8")
 
             logger.info(f"[{agent_id}] Thesis validation: {len(result.flagged_files)} flag(s)")
             job_status.complete(agent_id, task)
