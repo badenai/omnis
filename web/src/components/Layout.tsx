@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { useActivity } from '../api/scheduler';
-import ActivityPanel from './ActivityPanel';
+import { useActivityStream } from '../api/scheduler';
+import ActivityDrawer from './ActivityDrawer';
 
 function AgentsIcon() {
   return (
@@ -18,144 +19,227 @@ function SchedulerIcon() {
   );
 }
 
+function TerminalIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="2" width="14" height="12" rx="2" />
+      <path d="M4 6l3 2.5L4 11" />
+      <path d="M9 11h3" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon({ flipped }: { flipped?: boolean }) {
+  return (
+    <svg
+      width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+      strokeWidth={1.5} strokeLinecap="round"
+      style={{ transform: flipped ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}
+    >
+      <path d="M2 8l4-4 4 4" />
+    </svg>
+  );
+}
+
 export default function Layout() {
-  const { data } = useActivity();
-  const activeCount = data?.active?.length ?? 0;
+  const { active, history } = useActivityStream();
+  const activeCount = active.length;
+  const historyCount = history.length;
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const prevCountRef = useRef(0);
+
+  // Auto-open drawer when a job starts (only on 0 → 1+ transition)
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    prevCountRef.current = activeCount;
+    if (activeCount > 0 && prev === 0) {
+      setDrawerOpen(true);
+    }
+  }, [activeCount]);
 
   return (
     <div
-      className="flex h-screen"
-      style={{ backgroundColor: 'var(--color-surface-0)', color: 'var(--color-text-primary)', fontFamily: 'var(--font-sans)' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        backgroundColor: 'var(--color-surface-0)',
+        color: 'var(--color-text-primary)',
+        fontFamily: 'var(--font-sans)',
+      }}
     >
-      {/* Sidebar */}
-      <nav
-        className="w-60 shrink-0 flex flex-col"
-        style={{ backgroundColor: 'var(--color-surface-1)', borderRight: '1px solid var(--color-border-subtle)' }}
-      >
-        {/* Logo */}
-        <div className="px-5 py-5" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-          <div className="flex items-center gap-1.5">
-            {/* Orbital swirl logo mark */}
-            <div
-              className="w-10 h-10 flex items-center justify-center shrink-0"
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <defs>
-                  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#ffffff" />
-                    <stop offset="5%" stopColor="#818cf8" />
-                    <stop offset="35%" stopColor="var(--color-accent)" />
-                    <stop offset="80%" stopColor="var(--color-accent-dim)" />
-                    <stop offset="100%" stopColor="var(--color-surface-4)" />
-                  </linearGradient>
-                  <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
-                    <feGaussianBlur stdDeviation="1.5" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                </defs>
-                <g filter="url(#glow)">
-                  <ellipse cx="12" cy="12" rx="7" ry="9" stroke="url(#ringGrad)" strokeWidth="4.5" />
-                </g>
-              </svg>
-            </div>
-            <div className="text-xl font-semibold leading-none" style={{ color: 'var(--color-text-primary)' }}>
-              Omnis
+      {/* Top row: sidebar + main content */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <nav
+          style={{
+            width: 240,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'var(--color-surface-1)',
+            borderRight: '1px solid var(--color-border-subtle)',
+          }}
+        >
+          {/* Logo */}
+          <div style={{ padding: '20px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <defs>
+                    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#ffffff" />
+                      <stop offset="5%" stopColor="#818cf8" />
+                      <stop offset="35%" stopColor="var(--color-accent)" />
+                      <stop offset="80%" stopColor="var(--color-accent-dim)" />
+                      <stop offset="100%" stopColor="var(--color-surface-4)" />
+                    </linearGradient>
+                    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+                      <feGaussianBlur stdDeviation="1.5" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+                  <g filter="url(#glow)">
+                    <ellipse cx="12" cy="12" rx="7" ry="9" stroke="url(#ringGrad)" strokeWidth="4.5" />
+                  </g>
+                </svg>
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1, color: 'var(--color-text-primary)' }}>
+                Omnis
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Nav */}
-        <div className="flex flex-col gap-0.5 p-3 mt-1">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${
-                isActive ? 'font-medium' : ''
-              }`
-            }
-            style={({ isActive }) => ({
-              color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
-            })}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span
-                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full"
-                    style={{ backgroundColor: 'var(--color-accent)' }}
-                  />
-                )}
-                <AgentsIcon />
-                <span>Agents</span>
-                {activeCount > 0 && (
-                  <span className="ml-auto flex items-center gap-1.5">
+          {/* Nav */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '12px', marginTop: 4 }}>
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${isActive ? 'font-medium' : ''}`
+              }
+              style={({ isActive }) => ({
+                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
+              })}
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
                     <span
-                      className="w-1.5 h-1.5 rounded-full animate-pulse"
-                      style={{ backgroundColor: 'var(--color-status-active)' }}
+                      style={{
+                        position: 'absolute', left: 0, top: 4, bottom: 4,
+                        width: 2, borderRadius: 999, backgroundColor: 'var(--color-accent)',
+                      }}
                     />
-                  </span>
-                )}
-              </>
-            )}
-          </NavLink>
+                  )}
+                  <AgentsIcon />
+                  <span>Agents</span>
+                  {activeCount > 0 && (
+                    <span style={{ marginLeft: 'auto' }}>
+                      <span
+                        className="animate-pulse"
+                        style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-active)' }}
+                      />
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
 
-          <NavLink
-            to="/jobs"
-            className={({ isActive }) =>
-              `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${
-                isActive ? 'font-medium' : ''
-              }`
-            }
-            style={({ isActive }) => ({
-              color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
-            })}
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span
-                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full"
-                    style={{ backgroundColor: 'var(--color-accent)' }}
-                  />
-                )}
-                <SchedulerIcon />
-                <span>Scheduler</span>
-              </>
-            )}
-          </NavLink>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Activity Panel */}
-        <div className="p-3" style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
-          <div
-            className="rounded-lg p-3"
-            style={{ backgroundColor: 'var(--color-surface-2)' }}
-          >
-            <div
-              className="text-[10px] uppercase tracking-[0.1em] font-medium mb-2"
-              style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
+            <NavLink
+              to="/jobs"
+              className={({ isActive }) =>
+                `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${isActive ? 'font-medium' : ''}`
+              }
+              style={({ isActive }) => ({
+                color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
+              })}
             >
-              Activity
-            </div>
-            <ActivityPanel />
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span
+                      style={{
+                        position: 'absolute', left: 0, top: 4, bottom: 4,
+                        width: 2, borderRadius: 999, backgroundColor: 'var(--color-accent)',
+                      }}
+                    />
+                  )}
+                  <SchedulerIcon />
+                  <span>Scheduler</span>
+                </>
+              )}
+            </NavLink>
           </div>
-        </div>
-      </nav>
 
-      {/* Main content */}
-      <main
-        className="flex-1 overflow-auto"
-        style={{ backgroundColor: 'var(--color-surface-0)' }}
-      >
-        <div className="w-full max-w-7xl mx-auto px-8 py-8">
-          <Outlet />
-        </div>
-      </main>
+          <div style={{ flex: 1 }} />
+
+          {/* Training Log toggle button */}
+          <button
+            onClick={() => setDrawerOpen(v => !v)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '11px 16px',
+              width: '100%',
+              background: drawerOpen ? 'var(--color-surface-3)' : 'transparent',
+              border: 'none',
+              borderTop: '1px solid var(--color-border-subtle)',
+              cursor: 'pointer',
+              color: activeCount > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
+              transition: 'background 150ms, color 150ms',
+              textAlign: 'left',
+            }}
+            onMouseEnter={e => {
+              if (!drawerOpen) (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-2)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = drawerOpen ? 'var(--color-surface-3)' : 'transparent';
+              (e.currentTarget as HTMLButtonElement).style.color = activeCount > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)';
+            }}
+          >
+            <span style={{ color: activeCount > 0 ? 'var(--color-accent)' : 'inherit' }}>
+              <TerminalIcon />
+            </span>
+            <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', flex: 1, letterSpacing: '0.02em' }}>
+              {activeCount > 0 ? `${activeCount} running` : 'Training Log'}
+            </span>
+            {activeCount > 0 && (
+              <span
+                className="animate-pulse"
+                style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-active)', flexShrink: 0 }}
+              />
+            )}
+            <ChevronUpIcon flipped={drawerOpen} />
+          </button>
+        </nav>
+
+        {/* Main content */}
+        <main
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            backgroundColor: 'var(--color-surface-0)',
+          }}
+        >
+          <div style={{ width: '100%', maxWidth: 1280, margin: '0 auto', padding: '32px' }}>
+            <Outlet />
+          </div>
+        </main>
+      </div>
+
+      {/* Training Log drawer — sits at bottom, pushes content up */}
+      <ActivityDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activeCount={activeCount}
+        historyCount={historyCount}
+      />
     </div>
   );
 }

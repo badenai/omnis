@@ -97,7 +97,7 @@ function ActiveJobCard({ job }: { job: JobActivity }) {
         ref={logRef}
         onScroll={handleScroll}
         className="px-2 py-1.5 overflow-y-auto flex flex-col gap-0.5"
-        style={{ maxHeight: '160px' }}
+        style={{ maxHeight: '280px' }}
       >
         {job.logs.length === 0 ? (
           <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Waiting for log output…</span>
@@ -155,27 +155,31 @@ export default function ActivityPanel() {
   return (
     <div>
       {active.length > 0 && (
-        <div className="mb-2">
+        <div className="mb-3">
           <div
-            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-1.5"
+            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-2"
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
           >
             Running
           </div>
-          {active.map((job) => <ActiveJobCard key={job.key} job={job} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 8 }}>
+            {active.map((job) => <ActiveJobCard key={job.key} job={job} />)}
+          </div>
         </div>
       )}
       {history.length > 0 && (
         <div>
           <div
-            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-1"
+            className="text-[9px] uppercase tracking-[0.1em] font-medium mb-1.5"
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}
           >
             Recent
           </div>
-          {history.slice(0, 8).map((job) => (
-            <HistoryJob key={`${job.key}-${job.finished_at}`} job={job} />
-          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '0 24px' }}>
+            {history.slice(0, 8).map((job) => (
+              <HistoryJob key={`${job.key}-${job.finished_at}`} job={job} />
+            ))}
+          </div>
         </div>
       )}
     </div>

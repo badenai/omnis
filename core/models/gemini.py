@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def _is_transient_api_error(exc: BaseException) -> bool:
     """True for Gemini errors that are safe to retry (rate-limit, overload, transient 5xx)."""
-    return isinstance(exc, genai_errors.ServerError) and exc.status_code in (429, 500, 503)
+    return isinstance(exc, genai_errors.ServerError) and exc.code in (429, 500, 503)
 
 
 _api_retry = retry(
