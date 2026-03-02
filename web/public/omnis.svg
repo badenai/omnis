@@ -11,8 +11,55 @@
       <feGaussianBlur stdDeviation="24" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
+    <style>
+      @keyframes logo-breathe {
+        0%, 100% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.02); filter: brightness(1.3); }
+      }
+      @keyframes eye-blink {
+        0%, 46%, 50%, 96%, 100% { transform: scaleY(1); }
+        48%, 98% { transform: scaleY(0.1); }
+      }
+      @keyframes eye-look {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(50px, -30px); }
+        25% { transform: translate(50px, -30px); }
+        35% { transform: translate(-40px, 40px); }
+        50% { transform: translate(-40px, 40px); }
+        60% { transform: translate(40px, 60px); }
+        75% { transform: translate(40px, 60px); }
+        85% { transform: translate(-40px, -40px); }
+        95% { transform: translate(-40px, -40px); }
+      }
+      .animated-logo {
+        transform-origin: 256px 256px;
+        animation: logo-breathe 4s ease-in-out infinite;
+      }
+      .eye-blink {
+        transform-origin: 256px 256px;
+        animation: eye-blink 5s ease-in-out infinite;
+      }
+      .eye-look {
+        animation: eye-look 5s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+        filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.8));
+      }
+    </style>
+    <clipPath id="eyeClip">
+      <ellipse cx="256" cy="256" rx="100" ry="130" />
+    </clipPath>
   </defs>
+  
   <g filter="url(#glow)">
     <ellipse cx="256" cy="256" rx="110" ry="140" stroke="url(#ringGrad)" stroke-width="95" />
+  </g>
+
+  <g clip-path="url(#eyeClip)">
+    <g class="eye-blink">
+      <g class="eye-look">
+        <circle cx="256" cy="256" r="80" fill="url(#ringGrad)" opacity="0.4" />
+        <circle cx="256" cy="256" r="60" fill="#818cf8" />
+        <circle cx="256" cy="256" r="30" fill="#ffffff" />
+      </g>
+    </g>
   </g>
 </svg>
