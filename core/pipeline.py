@@ -34,11 +34,13 @@ class CollectionPipeline:
             new_videos = get_new_videos(source_id, state.processed_ids)
             if not new_videos:
                 logger.info(f"No new videos from {source_id}")
+                job_status.log(agent_id, task, f"No new videos from {source_id}")
                 job_status.complete(agent_id, task)
                 return
 
             inbox = InboxWriter(self._dir)
             total = len(new_videos)
+            job_status.log(agent_id, task, f"Found {total} new video{'s' if total != 1 else ''} to analyze")
             for i, video in enumerate(new_videos, 1):
                 vid_id = video["id"]
                 vid_title = video.get("title", "")
@@ -64,10 +66,28 @@ class CollectionPipeline:
                     if result.credibility_signals:
                         state.record_source_credibility_flag(source_id, result.credibility_signals)
                     logger.info(f"Processed {vid_id} (relevance: {result.relevance_score})")
+
+                    score = result.relevance_score
+                    first_insight = result.insights[0][:80] if result.insights else result.raw_summary[:80]
+                    threshold_note = "" if score >= 0.3 else " — below threshold"
+                    job_status.log(
+                        agent_id, task,
+                        f'[{i}/{total}] "{vid_title[:50]}" — score {score:.2f}{threshold_note} — "{first_insight}"'
+                    )
                 except Exception as e:
                     logger.error(f"Failed to process {vid_id}: {e}")
+                    job_status.log(agent_id, task, f"[{i}/{total}] Failed: {vid_title[:50]} — {e}")
 
             self._check_source_health(state)
+            stats = state.get_source_stats(source_id)
+            scores = stats.get("scores", [])
+            avg = sum(scores[-10:]) / len(scores[-10:]) if scores else 0.0
+            status = stats.get("status", "active")
+            status_icon = "✓" if status == "active" else ("⏸" if status == "paused" else "⚠")
+            job_status.log(
+                agent_id, task,
+                f"Source health: {source_id} avg {avg:.2f} — {status} {status_icon}"
+            )
 
             from datetime import datetime, timezone
             state.update_last_checked(source_id, datetime.now(timezone.utc).isoformat())

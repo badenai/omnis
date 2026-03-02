@@ -1,6 +1,7 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { JobInfo } from '../types';
+import type { JobInfo, LogEntry } from '../types';
 
 export interface JobActivity {
   key: string;
@@ -11,6 +12,7 @@ export interface JobActivity {
   finished_at: string | null;
   state: 'running' | 'completed' | 'failed';
   error: string | null;
+  logs: LogEntry[];
 }
 
 export function useJobs() {
@@ -27,6 +29,28 @@ export function useActivity() {
     queryFn: () => apiFetch<{ active: JobActivity[]; history: JobActivity[] }>('/scheduler/activity'),
     refetchInterval: 3000,
   });
+}
+
+export function useActivityStream() {
+  const [data, setData] = useState<{ active: JobActivity[]; history: JobActivity[] }>({
+    active: [],
+    history: [],
+  });
+
+  useEffect(() => {
+    const es = new EventSource('/api/scheduler/activity/stream');
+    es.onmessage = (e) => {
+      try {
+        setData(JSON.parse(e.data));
+      } catch {
+        // ignore malformed frames
+      }
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, []);
+
+  return data;
 }
 
 export function useTriggerRun(agentId: string) {

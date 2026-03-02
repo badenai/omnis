@@ -1,7 +1,10 @@
+import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.responses import StreamingResponse
 
 from core.scheduler_instance import get_scheduler
 from core.scheduler import _run_daily
@@ -121,3 +124,18 @@ def get_activity():
         "active": job_status.get_active(),
         "history": job_status.get_history(),
     }
+
+
+@router.get("/activity/stream")
+async def stream_activity():
+    async def event_gen():
+        while True:
+            data = {"active": job_status.get_active(), "history": job_status.get_history()}
+            yield f"data: {json.dumps(data)}\n\n"
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

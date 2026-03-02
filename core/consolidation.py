@@ -47,16 +47,20 @@ class ConsolidationPipeline:
                 content = items[decision.inbox_index]
                 if decision.action == "update_concept":
                     kw.update_concept(decision.target, content, source_id="inbox")
+                    job_status.log(agent_id, task, f"update_concept: {decision.target}")
                 elif decision.action == "new_concept":
                     kw.write_concept(decision.target, content)
+                    job_status.log(agent_id, task, f"new_concept: {decision.target}")
                 elif decision.action == "new_recent":
                     kw.write_recent(decision.target, content, source_id="inbox")
+                    job_status.log(agent_id, task, f"new_recent: {decision.target}")
 
             knowledge_files = kw.load_all_weighted()
 
             job_status.update_step(agent_id, task, "Generating digest.md...")
             digest = self._provider.generate_digest(knowledge_files, self._soul)
             (self._dir / "digest.md").write_text(digest, encoding="utf-8")
+            job_status.log(agent_id, task, f"digest.md written ({len(digest):,} chars)")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
             skill_content = self._provider.generate_skill(
@@ -64,6 +68,7 @@ class ConsolidationPipeline:
             )
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
+            job_status.log(agent_id, task, "SKILL.md written")
 
             reg = Registry(DATA_DIR / "registry.json")
             reg.register(
@@ -79,6 +84,8 @@ class ConsolidationPipeline:
             pruned = kw.prune_low_weight(threshold=0.1)
             if pruned:
                 self._write_pruning_log(pruned)
+                for p in pruned:
+                    job_status.log(agent_id, task, f"pruned: {p}")
 
             job_status.update_step(agent_id, task, "Generating SOUL evolution suggestions...")
             try:

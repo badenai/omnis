@@ -78,6 +78,11 @@ export interface JobInfo {
   next_run_time: string | null;
 }
 
+export interface LogEntry {
+  ts: string;
+  msg: string;
+}
+
 export interface KnowledgeFile {
   path: string;
   effective_weight: number;

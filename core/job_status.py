@@ -6,6 +6,7 @@ _lock = threading.Lock()
 _active: dict[str, dict] = {}   # key: "{agent_id}/{task}"
 _history: list[dict] = []
 _MAX_HISTORY = 30
+_MAX_LOGS = 100
 
 
 def _now() -> str:
@@ -24,6 +25,7 @@ def start(agent_id: str, task: str, step: str = "Starting...") -> None:
             "state": "running",
             "error": None,
             "finished_at": None,
+            "logs": [],
         }
 
 
@@ -32,6 +34,16 @@ def update_step(agent_id: str, task: str, step: str) -> None:
     with _lock:
         if key in _active:
             _active[key]["step"] = step
+
+
+def log(agent_id: str, task: str, msg: str) -> None:
+    key = f"{agent_id}/{task}"
+    with _lock:
+        if key in _active:
+            logs = _active[key]["logs"]
+            logs.append({"ts": _now(), "msg": msg})
+            if len(logs) > _MAX_LOGS:
+                del logs[0]
 
 
 def complete(agent_id: str, task: str) -> None:

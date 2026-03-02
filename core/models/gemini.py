@@ -1,12 +1,31 @@
 import json
 import logging
 from google import genai
+from google.genai import errors as genai_errors
+from tenacity import (
+    retry, retry_if_exception, stop_after_attempt, wait_exponential, before_sleep_log,
+)
 from core.models.types import (
     AnalysisResult, ConsolidationResult, ConsolidationDecision,
     ResearchFinding, DiscoveredSource, ThesisValidationResult, CredibilitySignals,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_transient_api_error(exc: BaseException) -> bool:
+    """True for Gemini errors that are safe to retry (rate-limit, overload, transient 5xx)."""
+    return isinstance(exc, genai_errors.ServerError) and exc.status_code in (429, 500, 503)
+
+
+_api_retry = retry(
+    retry=retry_if_exception(_is_transient_api_error),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
+    stop=stop_after_attempt(4),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+
 
 _ANALYSIS_SCHEMA = """
 Respond with valid JSON only, no markdown fences:
@@ -114,6 +133,7 @@ class GeminiProvider:
         self._model_name = model_name
         self._consolidation_model_name = consolidation_model_name
 
+    @_api_retry
     def _generate(self, contents: str | list, model: str | None = None) -> str:
         response = self._client.models.generate_content(
             model=model or self._model_name,
@@ -354,6 +374,7 @@ class GeminiProvider:
     # NOTE: JSON response mode is incompatible with google_search — plain text only.
     # -------------------------------------------------------------------------
 
+    @_api_retry
     def _generate_with_search(self, contents: str) -> str:
         """Generate with Gemini's built-in google_search tool enabled.
         NOTE: JSON response mode is incompatible with google_search — plain text only.
