@@ -20,6 +20,7 @@ from api.schemas import (
     IngestChannelExecuteRequest,
     IngestUrlRequest,
     SoulUpdate,
+    SourceStats,
 )
 from core.collector import get_channel_videos
 from yt_dlp.utils import DownloadError
@@ -64,6 +65,9 @@ def _agent_detail(agent: dict) -> AgentDetail:
     kw = KnowledgeWriter(agent_dir, config.decay.get("half_life_days", 365))
     knowledge_files = kw.load_all_weighted()
 
+    raw_source_stats = state._data.get("source_stats", {})
+    source_stats = {sid: SourceStats(**s) for sid, s in raw_source_stats.items()}
+
     return AgentDetail(
         agent_id=config.agent_id,
         model=config.model,
@@ -79,6 +83,7 @@ def _agent_detail(agent: dict) -> AgentDetail:
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
         knowledge_count=len(knowledge_files),
+        source_stats=source_stats,
     )
 
 
@@ -296,6 +301,29 @@ def ingest_channel_preview(
     except DownloadError as exc:
         raise HTTPException(422, detail=f"Could not fetch channel: {exc}")
     return {"count": len(videos), "videos": videos}
+
+
+@router.get("/{agent_id}/soul-suggestions")
+def get_soul_suggestions(agent_id: str, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    path = agents[agent_id]["dir"] / "soul_suggestions.md"
+    if not path.exists():
+        return {"suggestions": None}
+    return {"suggestions": path.read_text(encoding="utf-8")}
+
+
+@router.post("/{agent_id}/sources/{source_id}/reset-status")
+def reset_source_status(agent_id: str, source_id: str, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent_dir = agents[agent_id]["dir"]
+    state = AgentState(agent_dir)
+    state.set_source_status(source_id, "active", None)
+    state.save()
+    return {"status": "ok", "source_id": source_id, "new_status": "active"}
 
 
 @router.post("/{agent_id}/ingest/channel/execute", status_code=202)

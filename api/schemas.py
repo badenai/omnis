@@ -53,6 +53,14 @@ class AgentSummary(BaseModel):
     self_improving: bool = True
 
 
+class SourceStats(BaseModel):
+    scores: list[float] = []
+    credibility_flags: dict = {}
+    status: str = "active"
+    flagged_reason: str | None = None
+    flagged_at: str | None = None
+
+
 class AgentDetail(BaseModel):
     agent_id: str
     model: str
@@ -68,6 +76,7 @@ class AgentDetail(BaseModel):
     last_consolidation: str | None = None
     inbox_count: int = 0
     knowledge_count: int = 0
+    source_stats: dict[str, SourceStats] = {}
 
 
 class IngestUrlRequest(BaseModel):

@@ -56,6 +56,32 @@ export function useTriggerReevaluation(agentId: string) {
   });
 }
 
+export function useTriggerFactCheck(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) =>
+      apiFetch(`/scheduler/trigger/${agentId}/fact-check/${encodeURIComponent(sourceId)}`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
+export function useResetSourceStatus(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) =>
+      apiFetch(`/agents/${agentId}/sources/${encodeURIComponent(sourceId)}/reset-status`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['agents', agentId] }),
+  });
+}
+
+export function useSoulSuggestions(agentId: string) {
+  return useQuery({
+    queryKey: ['soul-suggestions', agentId],
+    queryFn: () => apiFetch<{ suggestions: string | null }>(`/agents/${agentId}/soul-suggestions`),
+    refetchInterval: false,
+  });
+}
+
 export function useDiscoveredSources(agentId: string) {
   return useQuery({
     queryKey: ['discovered-sources', agentId],

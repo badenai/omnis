@@ -5,6 +5,7 @@ from core.pipeline import CollectionPipeline
 from core.consolidation import ConsolidationPipeline
 from core.self_improving import SelfImprovingSession
 from core.manual_ingestion import ManualIngestionPipeline
+from core.fact_checker import FactChecker
 
 
 def load_agent(agent_dir: pathlib.Path, gemini_api_key: str) -> dict:
@@ -30,4 +31,5 @@ def load_agent(agent_dir: pathlib.Path, gemini_api_key: str) -> dict:
         "consolidation": consolidation,
         "self_improving": SelfImprovingSession(agent_dir, config, provider, soul),
         "ingestion": ManualIngestionPipeline(agent_dir, config, provider, soul, consolidation),
+        "fact_checker": FactChecker(agent_dir, config, provider, soul),
     }

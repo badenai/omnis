@@ -22,6 +22,14 @@ export interface AgentSummary {
   self_improving: boolean;
 }
 
+export interface SourceStats {
+  scores: number[];
+  credibility_flags: { hype_pattern: number; unverified_claims: number };
+  status: 'active' | 'paused' | 'flagged';
+  flagged_reason: string | null;
+  flagged_at: string | null;
+}
+
 export interface AgentDetail {
   agent_id: string;
   model: string;
@@ -37,6 +45,7 @@ export interface AgentDetail {
   last_consolidation: string | null;
   inbox_count: number;
   knowledge_count: number;
+  source_stats: Record<string, SourceStats>;
 }
 
 export interface AgentConfigCreate {

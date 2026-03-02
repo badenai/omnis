@@ -91,6 +91,30 @@ def trigger_reevaluation(agent_id: str, request: Request):
     return {"status": "triggered", "agent_id": agent_id}
 
 
+@router.post("/trigger/{agent_id}/fact-check/{source_id}")
+def trigger_fact_check(agent_id: str, source_id: str, request: Request):
+    agents = request.app.state.agents
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+
+    agent = agents[agent_id]
+    fact_checker = agent.get("fact_checker")
+    if not fact_checker:
+        raise HTTPException(500, "Fact checker not available")
+
+    scheduler = get_scheduler()
+    scheduler.add_job(
+        fact_checker.run,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        args=[source_id],
+        id=f"{agent_id}_factcheck_{source_id}_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Fact-check {source_id} for {agent_id}",
+    )
+    logger.info(f"Triggered fact-check: {agent_id} / {source_id}")
+    return {"status": "triggered", "agent_id": agent_id, "source_id": source_id}
+
+
 @router.get("/activity")
 def get_activity():
     return {

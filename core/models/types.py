@@ -2,6 +2,13 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class CredibilitySignals:
+    hype_pattern: bool
+    unverified_claims: bool
+    hype_phrases: list[str]        # up to 3 example phrases
+
+
+@dataclass
 class AnalysisResult:
     video_id: str
     video_title: str
@@ -10,6 +17,7 @@ class AnalysisResult:
     suggested_action: str          # "update_concept" | "new_concept" | "new_recent"
     suggested_target: str          # filename hint (without extension)
     raw_summary: str
+    credibility_signals: "CredibilitySignals | None" = None
 
 
 @dataclass

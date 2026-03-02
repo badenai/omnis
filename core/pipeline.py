@@ -4,6 +4,7 @@ from core.collector import get_new_videos, fetch_transcript
 from core.state import AgentState
 from core.inbox import InboxWriter
 from core.models.types import AgentConfig
+from core.warnings import append_warnings
 from core import job_status
 
 logger = logging.getLogger(__name__)
@@ -16,16 +17,23 @@ class CollectionPipeline:
         self._provider = provider
         self._soul = soul
 
-    def run_collection(self, channel_handle: str) -> None:
+    def run_collection(self, source_id: str) -> None:
         agent_id = self._config.agent_id
-        task = f"collect/{channel_handle}"
-        job_status.start(agent_id, task, f"Fetching new videos from {channel_handle}...")
+        task = f"collect/{source_id}"
+
+        # Check source health before starting
+        state = AgentState(self._dir)
+        stats = state.get_source_stats(source_id)
+        if stats.get("status") in ("paused", "flagged"):
+            logger.info(f"Skipping {source_id} (status: {stats['status']})")
+            return
+
+        job_status.start(agent_id, task, f"Fetching new videos from {source_id}...")
 
         try:
-            state = AgentState(self._dir)
-            new_videos = get_new_videos(channel_handle, state.processed_ids)
+            new_videos = get_new_videos(source_id, state.processed_ids)
             if not new_videos:
-                logger.info(f"No new videos from {channel_handle}")
+                logger.info(f"No new videos from {source_id}")
                 job_status.complete(agent_id, task)
                 return
 
@@ -50,18 +58,54 @@ class CollectionPipeline:
                             "Extract key insights relevant to this agent's domain.",
                         )
 
-                    inbox.append(channel_handle, result)
+                    inbox.append(source_id, result)
                     state.mark_processed(vid_id)
+                    state.record_source_score(source_id, result.relevance_score)
+                    if result.credibility_signals:
+                        state.record_source_credibility_flag(source_id, result.credibility_signals)
                     logger.info(f"Processed {vid_id} (relevance: {result.relevance_score})")
                 except Exception as e:
                     logger.error(f"Failed to process {vid_id}: {e}")
 
+            self._check_source_health(state)
+
             from datetime import datetime, timezone
-            state.update_last_checked(channel_handle, datetime.now(timezone.utc).isoformat())
+            state.update_last_checked(source_id, datetime.now(timezone.utc).isoformat())
             state.save()
             job_status.complete(agent_id, task)
 
         except Exception as e:
-            logger.error(f"Collection failed for {channel_handle}: {e}")
+            logger.error(f"Collection failed for {source_id}: {e}")
             job_status.fail(agent_id, task, str(e))
             raise
+
+    def _check_source_health(self, state: AgentState) -> None:
+        state.recompute_agent_average()
+        avg = state._data["agent_score_average"]
+        warnings = []
+
+        for source_id, stats in state._data["source_stats"].items():
+            scores = stats.get("scores", [])
+            if len(scores) < 5:
+                continue
+            source_avg = sum(scores) / len(scores)
+            flags = stats.get("credibility_flags", {})
+
+            if source_avg < avg * 0.6:
+                state.set_source_status(source_id, "paused", "low_scores")
+                warnings.append(
+                    f"⏸ {source_id} paused: avg score {source_avg:.2f} vs agent avg {avg:.2f}"
+                )
+            elif flags.get("hype_pattern", 0) >= 3:
+                state.set_source_status(source_id, "flagged", "hype_pattern")
+                warnings.append(
+                    f"⚠ {source_id} flagged: hype_pattern detected in ≥3 videos"
+                )
+            elif flags.get("unverified_claims", 0) >= 3:
+                state.set_source_status(source_id, "flagged", "unverified_claims")
+                warnings.append(
+                    f"⚠ {source_id} flagged: unverified_claims in ≥3 videos"
+                )
+
+        if warnings:
+            append_warnings(self._dir, warnings)

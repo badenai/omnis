@@ -74,6 +74,19 @@ class ConsolidationPipeline:
             reg.save()
 
             self._update_index(knowledge_files)
+
+            job_status.update_step(agent_id, task, "Pruning low-weight knowledge files...")
+            pruned = kw.prune_low_weight(threshold=0.1)
+            if pruned:
+                self._write_pruning_log(pruned)
+
+            job_status.update_step(agent_id, task, "Generating SOUL evolution suggestions...")
+            try:
+                suggestions = self._provider.suggest_soul_refinements(self._soul, knowledge_files[:15])
+                (self._dir / "soul_suggestions.md").write_text(suggestions, encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"[{agent_id}] Soul suggestions failed (non-fatal): {e}")
+
             inbox.clear()
 
             state = AgentState(self._dir)
@@ -187,6 +200,15 @@ class ConsolidationPipeline:
             self.run_thesis_validation()
         except Exception:
             logger.warning(f"[{self._config.agent_id}] Thesis validation failed; consolidation continues.")
+
+    def _write_pruning_log(self, pruned: list[str]) -> None:
+        from datetime import datetime, timezone
+        path = self._dir / "pruning_log.md"
+        existing = path.read_text(encoding="utf-8") if path.exists() else "# Pruning Log\n"
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        block = f"\n## {ts}\nArchived {len(pruned)} file(s):\n"
+        block += "\n".join(f"- `{p}`" for p in pruned) + "\n"
+        path.write_text(existing + block, encoding="utf-8")
 
     def _update_index(self, files: list[dict]) -> None:
         lines = ["# Knowledge Index\n"]

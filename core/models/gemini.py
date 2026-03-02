@@ -3,7 +3,7 @@ import logging
 from google import genai
 from core.models.types import (
     AnalysisResult, ConsolidationResult, ConsolidationDecision,
-    ResearchFinding, DiscoveredSource, ThesisValidationResult,
+    ResearchFinding, DiscoveredSource, ThesisValidationResult, CredibilitySignals,
 )
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,18 @@ Respond with valid JSON only, no markdown fences:
   "relevance_score": <0.0-1.0>,
   "suggested_action": "<update_concept|new_concept|new_recent>",
   "suggested_target": "<filename-hint-no-extension>",
-  "raw_summary": "<full summary>"
+  "raw_summary": "<full summary>",
+  "credibility_signals": {
+    "hype_pattern": false,
+    "unverified_claims": false,
+    "hype_phrases": []
+  }
 }
+
+Credibility evaluation:
+- hype_pattern: true if the content relies on superlatives or promises without evidence (e.g. "guaranteed profits", "life-changing results", "everyone is doing this").
+- unverified_claims: true if specific outcome claims (income figures, returns, results) are made without verifiable sources.
+- hype_phrases: up to 3 short example phrases from the content that triggered the above flags (empty list if none).
 """
 
 _REEVALUATE_SCHEMA = """
@@ -111,6 +121,16 @@ class GeminiProvider:
         )
         return response.text
 
+    def _parse_credibility_signals(self, data: dict) -> "CredibilitySignals | None":
+        raw = data.get("credibility_signals")
+        if not isinstance(raw, dict):
+            return None
+        return CredibilitySignals(
+            hype_pattern=bool(raw.get("hype_pattern", False)),
+            unverified_claims=bool(raw.get("unverified_claims", False)),
+            hype_phrases=raw.get("hype_phrases", [])[:3],
+        )
+
     def _parse_result(self, raw: str) -> dict:
         text = raw.strip()
         if text.startswith("```"):
@@ -123,6 +143,11 @@ class GeminiProvider:
             )
             raise
 
+    def _build_analysis_result(self, data: dict) -> AnalysisResult:
+        credibility_signals = self._parse_credibility_signals(data)
+        data.pop("credibility_signals", None)
+        return AnalysisResult(**data, credibility_signals=credibility_signals)
+
     def analyze_transcript(
         self, video_id: str, video_title: str, transcript: str, soul: str, prompt: str
     ) -> AnalysisResult:
@@ -131,7 +156,7 @@ class GeminiProvider:
             f"VIDEO ID: {video_id}\nTITLE: {video_title}\n\nTRANSCRIPT:\n{transcript}"
         )
         data = self._parse_result(self._generate(contents))
-        return AnalysisResult(**data)
+        return self._build_analysis_result(data)
 
     def analyze_video(
         self, video_id: str, video_title: str, video_url: str, soul: str, prompt: str
@@ -143,7 +168,7 @@ class GeminiProvider:
             f"Extract insights relevant to the agent's domain."
         )
         data = self._parse_result(self._generate(contents))
-        return AnalysisResult(**data)
+        return self._build_analysis_result(data)
 
     def analyze_web_content(
         self, url: str, text: str, title: str, soul: str
@@ -158,7 +183,7 @@ class GeminiProvider:
             f"PAGE CONTENT:\n{text[:12000]}"
         )
         raw = self._generate(contents, model=self._model_name)
-        return AnalysisResult(**self._parse_result(raw))
+        return self._build_analysis_result(self._parse_result(raw))
 
     def analyze_uploaded_file(
         self, file_bytes: bytes, mime_type: str, title: str, soul: str
@@ -194,7 +219,7 @@ class GeminiProvider:
             self._client.files.delete(name=file_ref.name)
         except Exception:
             pass
-        return AnalysisResult(**self._parse_result(response.text))
+        return self._build_analysis_result(self._parse_result(response.text))
 
     def generate_digest(self, knowledge_files: list[dict], soul: str, mode: str = "") -> str:
         from datetime import date
@@ -376,6 +401,22 @@ class GeminiProvider:
         prompt = _VALIDATION_PROMPT_TEMPLATE.format(soul=soul, files_text=files_text)
         text = self._generate_with_search(prompt)
         return self._parse_validation_response(text)
+
+    def suggest_soul_refinements(self, soul: str, knowledge_files: list[dict]) -> str:
+        """Generate soul improvement suggestions based on what the agent has actually learned."""
+        files_text = "\n\n".join(
+            f"### {f['path']}\n{f['content'][:300]}" for f in knowledge_files
+        )
+        contents = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"TOP KNOWLEDGE FILES (by effective_weight):\n{files_text}\n\n"
+            f"Based on what this agent has actually learned versus what the SOUL specifies, "
+            f"suggest up to 5 concrete improvements to the SOUL.md. "
+            f"Focus on: (1) underrepresented topics worth adding, (2) noise signals to narrow or remove, "
+            f"(3) new keywords or phrases that appear frequently but are not mentioned. "
+            f"Format as a numbered list with brief reasoning for each suggestion."
+        )
+        return self._generate(contents, model=self._consolidation_model_name)
 
     # -------------------------------------------------------------------------
     # Delimited block parsers (used by grounded/search-enabled methods)

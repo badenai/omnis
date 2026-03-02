@@ -70,6 +70,28 @@ class KnowledgeWriter:
         post["relevance_score"] = score
         dest.write_text(frontmatter.dumps(post), encoding="utf-8")
 
+    def prune_low_weight(self, threshold: float = 0.1) -> list[str]:
+        """Move files with effective_weight < threshold to knowledge/archived/YYYY-MM/."""
+        if not self._base.exists():
+            return []
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        archive = self._base / "archived" / month
+        pruned = []
+        for f in list(self._base.rglob("*.md")):
+            if "archived" in f.parts or f.name == "_index.md":
+                continue
+            post = frontmatter.load(str(f))
+            created_str = post.get("created", datetime.now(timezone.utc).date().isoformat())
+            age = (datetime.now(timezone.utc).date() - date.fromisoformat(str(created_str))).days
+            score = float(post.get("relevance_score", 1.0))
+            weight = self.compute_effective_weight(score, age)
+            if weight < threshold:
+                archive.mkdir(parents=True, exist_ok=True)
+                dest = archive / f.name
+                f.rename(dest)
+                pruned.append(str(f.relative_to(self._base)))
+        return pruned
+
     def load_all_weighted(self) -> list[dict]:
         """Load all knowledge files sorted by effective_weight descending."""
         files = []
