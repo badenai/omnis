@@ -8,6 +8,21 @@ _history: list[dict] = []
 _MAX_HISTORY = 30
 _MAX_LOGS = 100
 
+# Thread-local: tracks which job is running on the current thread
+# so retry callbacks can log without needing to pass agent_id/task down.
+_ctx = threading.local()
+
+
+def set_current(agent_id: str, task: str) -> None:
+    _ctx.agent_id = agent_id
+    _ctx.task = task
+
+
+def get_current() -> tuple[str, str] | None:
+    agent_id = getattr(_ctx, "agent_id", None)
+    task = getattr(_ctx, "task", None)
+    return (agent_id, task) if agent_id and task else None
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()

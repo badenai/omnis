@@ -29,6 +29,7 @@ class CollectionPipeline:
             return
 
         job_status.start(agent_id, task, f"Fetching new videos from {source_id}...")
+        job_status.set_current(agent_id, task)
 
         try:
             new_videos = get_new_videos(source_id, state.processed_ids)

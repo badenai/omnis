@@ -3,7 +3,7 @@ import logging
 from google import genai
 from google.genai import errors as genai_errors
 from tenacity import (
-    retry, retry_if_exception, stop_after_attempt, wait_exponential, before_sleep_log,
+    retry, retry_if_exception, stop_after_attempt, wait_exponential,
 )
 from core.models.types import (
     AnalysisResult, ConsolidationResult, ConsolidationDecision,
@@ -18,11 +18,27 @@ def _is_transient_api_error(exc: BaseException) -> bool:
     return isinstance(exc, genai_errors.ServerError) and exc.code in (429, 500, 503)
 
 
+def _log_retry(retry_state) -> None:
+    """Log retry events to both the Python logger and the active job's activity log."""
+    from core import job_status
+    exc = retry_state.outcome.exception()
+    wait = getattr(retry_state.next_action, "sleep", 0)
+    attempt = retry_state.attempt_number
+    code = getattr(exc, "code", "") if exc else ""
+    err = f"{code} " if code else ""
+    err += type(exc).__name__ if exc else "error"
+    msg = f"↻ retrying in {wait:.0f}s — attempt {attempt}/4 failed ({err})"
+    logger.warning(msg)
+    ctx = job_status.get_current()
+    if ctx:
+        job_status.log(ctx[0], ctx[1], msg)
+
+
 _api_retry = retry(
     retry=retry_if_exception(_is_transient_api_error),
     wait=wait_exponential(multiplier=2, min=5, max=60),
     stop=stop_after_attempt(4),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
+    before_sleep=_log_retry,
     reraise=True,
 )
 

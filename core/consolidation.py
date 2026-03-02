@@ -23,6 +23,7 @@ class ConsolidationPipeline:
         agent_id = self._config.agent_id
         task = "consolidation"
         job_status.start(agent_id, task, "Reading inbox...")
+        job_status.set_current(agent_id, task)
 
         try:
             inbox = InboxWriter(self._dir)
@@ -112,6 +113,7 @@ class ConsolidationPipeline:
         agent_id = self._config.agent_id
         task = "reevaluation"
         job_status.start(agent_id, task, "Loading knowledge files...")
+        job_status.set_current(agent_id, task)
 
         try:
             kw = KnowledgeWriter(self._dir, self._config.decay.get("half_life_days", 365))

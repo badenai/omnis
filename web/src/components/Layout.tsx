@@ -99,10 +99,32 @@ export default function Layout() {
                       <feGaussianBlur stdDeviation="1.5" result="blur" />
                       <feComposite in="SourceGraphic" in2="blur" operator="over" />
                     </filter>
+                    <clipPath id="eyeClip">
+                      <ellipse cx="12" cy="12" rx="6.5" ry="8.5" />
+                    </clipPath>
                   </defs>
-                  <g filter="url(#glow)">
+                  
+                  <g filter="url(#glow)" className={activeCount === 0 ? "animate-logo-breathe" : ""} style={{ transformOrigin: '12px 12px' }}>
                     <ellipse cx="12" cy="12" rx="7" ry="9" stroke="url(#ringGrad)" strokeWidth="4.5" />
                   </g>
+
+                  {/* Eye content rendered only when active jobs are present */}
+                  {activeCount > 0 && (
+                    <g clipPath="url(#eyeClip)">
+                      <g className="animate-eye-blink" style={{ transformOrigin: '12px 12px' }}>
+                        <g 
+                          className="animate-eye-look" 
+                          style={{ filter: 'drop-shadow(0 0 2px rgba(129, 140, 248, 0.8))' }}
+                        >
+                          {/* Iris layer */}
+                          <circle cx="12" cy="12" r="4" fill="url(#ringGrad)" opacity="0.4" />
+                          <circle cx="12" cy="12" r="3" fill="#818cf8" />
+                          {/* Pupil layer */}
+                          <circle cx="12" cy="12" r="1.5" fill="#ffffff" />
+                        </g>
+                      </g>
+                    </g>
+                  )}
                 </svg>
               </div>
               <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1, color: 'var(--color-text-primary)' }}>

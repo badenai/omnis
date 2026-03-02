@@ -71,6 +71,15 @@ export function useTriggerCollection(agentId: string) {
   });
 }
 
+export function useTriggerConsolidation(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/scheduler/trigger/${agentId}/consolidate`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
 export function useTriggerReevaluation(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
