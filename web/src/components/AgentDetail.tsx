@@ -8,6 +8,7 @@ import KnowledgeBrowser from './KnowledgeBrowser';
 import ChatPanel from './ChatPanel';
 import IngestPanel from './IngestPanel';
 import InboxPanel from './InboxPanel';
+import SessionPanel from './SessionPanel';
 
 const sectionHeading: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
@@ -27,6 +28,7 @@ export default function AgentDetail() {
   const [viewMode, setViewMode] = useState<'chat' | 'manage'>('chat');
   const [showIngest, setShowIngest] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
+  const [rightPanel, setRightPanel] = useState<'knowledge' | 'session'>('knowledge');
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64" style={{ color: 'var(--color-text-muted)' }}>
@@ -171,12 +173,39 @@ export default function AgentDetail() {
                   className="rounded-xl p-5 flex-1 min-h-[500px] flex flex-col"
                   style={{ backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-subtle)' }}
                 >
-                  <div style={sectionHeading}>Knowledge Brain</div>
+                  {/* Toggle */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div
+                      className="flex items-center rounded-lg p-0.5"
+                      style={{ backgroundColor: 'var(--color-surface-3)', border: '1px solid var(--color-border-default)' }}
+                    >
+                      {(['knowledge', 'session'] as const).map((panel) => (
+                        <button
+                          key={panel}
+                          onClick={() => setRightPanel(panel)}
+                          className="px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors duration-150"
+                          style={{
+                            backgroundColor: rightPanel === panel ? 'var(--color-accent)' : 'transparent',
+                            color: rightPanel === panel ? '#fff' : 'var(--color-text-secondary)',
+                          }}
+                        >
+                          {panel === 'knowledge' ? 'Knowledge' : 'Session'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div
                     className="flex-1 overflow-hidden relative rounded-xl"
                     style={{ border: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-surface-2)' }}
                   >
-                    <KnowledgeBrowser agentId={agent.agent_id} />
+                    {rightPanel === 'knowledge' ? (
+                      <KnowledgeBrowser agentId={agent.agent_id} />
+                    ) : (
+                      <div className="p-4 h-full flex flex-col">
+                        <SessionPanel agentId={agent.agent_id} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

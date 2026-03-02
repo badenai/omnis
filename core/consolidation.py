@@ -1,3 +1,4 @@
+import difflib
 import pathlib
 import logging
 from core.constants import DATA_DIR
@@ -60,7 +61,23 @@ class ConsolidationPipeline:
 
             job_status.update_step(agent_id, task, "Generating digest.md...")
             digest = self._provider.generate_digest(knowledge_files, self._soul)
-            (self._dir / "digest.md").write_text(digest, encoding="utf-8")
+            digest_path = self._dir / "digest.md"
+            previous_digest = digest_path.read_text(encoding="utf-8") if digest_path.exists() else None
+            digest_path.write_text(digest, encoding="utf-8")
+            if previous_digest is None:
+                digest_changed = True
+            elif previous_digest == digest:
+                digest_changed = False
+            else:
+                digest_changed = True
+                (self._dir / "digest.previous.md").write_text(previous_digest, encoding="utf-8")
+                diff = difflib.unified_diff(
+                    previous_digest.splitlines(keepends=True),
+                    digest.splitlines(keepends=True),
+                    fromfile="digest.previous.md",
+                    tofile="digest.md",
+                )
+                (self._dir / "digest.diff").write_text("".join(diff), encoding="utf-8")
             job_status.log(agent_id, task, f"digest.md written ({len(digest):,} chars)")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
@@ -68,7 +85,7 @@ class ConsolidationPipeline:
                 digest, self._soul, self._config.agent_id
             )
             sw = SkillWriter(self._dir)
-            sw.write(skill_content, self._config.agent_id)
+            skill_changed = sw.write(skill_content, self._config.agent_id)
             job_status.log(agent_id, task, "SKILL.md written")
 
             reg = Registry(DATA_DIR / "registry.json")
@@ -94,6 +111,21 @@ class ConsolidationPipeline:
                 (self._dir / "soul_suggestions.md").write_text(suggestions, encoding="utf-8")
             except Exception as e:
                 logger.warning(f"[{agent_id}] Soul suggestions failed (non-fatal): {e}")
+
+            try:
+                from core.session_report import write_session_report
+                write_session_report(
+                    agent_dir=self._dir,
+                    inbox_items=items,
+                    result=result,
+                    knowledge_files_after=knowledge_files,
+                    pruned_files=pruned,
+                    skill_changed=skill_changed,
+                    digest_changed=digest_changed,
+                )
+                job_status.log(agent_id, task, "last_session.md written")
+            except Exception as e:
+                logger.warning(f"[{agent_id}] Session report failed (non-fatal): {e}")
 
             inbox.clear()
 

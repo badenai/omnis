@@ -78,6 +78,36 @@ def read_inbox(agent_id: str, request: Request):
     return {"items": items, "count": len(items)}
 
 
+@router.get("/{agent_id}/session-report")
+def read_session_report(agent_id: str, request: Request):
+    agent = _get_agent(agent_id, request)
+    path = agent["dir"] / "last_session.md"
+    if not path.exists():
+        raise HTTPException(404, "last_session.md not found")
+    return {"content": path.read_text(encoding="utf-8")}
+
+
+def _read_diff(agent_dir: pathlib.Path, current_name: str, previous_name: str) -> dict:
+    current_path = agent_dir / current_name
+    if not current_path.exists():
+        raise HTTPException(404, f"{current_name} not found")
+    previous_path = agent_dir / previous_name
+    old_content = previous_path.read_text(encoding="utf-8") if previous_path.exists() else None
+    return {"old_content": old_content, "new_content": current_path.read_text(encoding="utf-8")}
+
+
+@router.get("/{agent_id}/skill-diff")
+def read_skill_diff(agent_id: str, request: Request):
+    agent = _get_agent(agent_id, request)
+    return _read_diff(agent["dir"], "SKILL.md", "SKILL.previous.md")
+
+
+@router.get("/{agent_id}/digest-diff")
+def read_digest_diff(agent_id: str, request: Request):
+    agent = _get_agent(agent_id, request)
+    return _read_diff(agent["dir"], "digest.md", "digest.previous.md")
+
+
 @router.get("/{agent_id}/search")
 def search_knowledge(agent_id: str, q: str = Query(..., min_length=1), request: Request = None):
     agent = _get_agent(agent_id, request)

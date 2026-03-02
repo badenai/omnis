@@ -11,7 +11,10 @@ def _run_daily(collection_pipeline, consolidation_pipeline, self_improving_sessi
         for ch in collection_pipeline._config.sources.get("youtube_channels", [])
     ]
     for handle in channels:
-        collection_pipeline.run_collection(handle)
+        try:
+            collection_pipeline.run_collection(handle)
+        except Exception as e:
+            logger.warning(f"Collection failed for {handle}, skipping: {e}")
     consolidation_pipeline.run()
     if self_improving_session and collection_pipeline._config.self_improving:
         self_improving_session.run()

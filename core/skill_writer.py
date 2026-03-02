@@ -1,3 +1,4 @@
+import difflib
 import json
 import pathlib
 from datetime import datetime, timezone
@@ -12,9 +13,13 @@ class SkillWriter:
     def __init__(self, agent_dir: pathlib.Path):
         self._agent_dir = agent_dir
 
-    def write(self, skill_content: str, agent_id: str) -> pathlib.Path:
+    def write(self, skill_content: str, agent_id: str) -> bool:
         # Local copy inside the agent directory
         local = self._agent_dir / "SKILL.md"
+
+        # Read existing before overwrite
+        previous_content = local.read_text("utf-8") if local.exists() else None
+
         local.write_text(skill_content, encoding="utf-8")
 
         # Global copy in the Claude Code plugin cache — correct discoverable path:
@@ -30,7 +35,23 @@ class SkillWriter:
 
         self._register_plugin(install_path)
 
-        return local
+        # Compute diff
+        if previous_content is None:
+            changed = True  # first run, nothing to diff
+        elif previous_content == skill_content:
+            changed = False  # identical, no diff written
+        else:
+            changed = True
+            (self._agent_dir / "SKILL.previous.md").write_text(previous_content, "utf-8")
+            diff = difflib.unified_diff(
+                previous_content.splitlines(keepends=True),
+                skill_content.splitlines(keepends=True),
+                fromfile="SKILL.previous.md",
+                tofile="SKILL.md",
+            )
+            (self._agent_dir / "SKILL.diff").write_text("".join(diff), "utf-8")
+
+        return changed
 
     def _register_plugin(self, install_path: pathlib.Path) -> None:
         plugins_file = (

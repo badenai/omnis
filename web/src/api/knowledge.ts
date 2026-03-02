@@ -49,3 +49,30 @@ export function useKnowledgeSearch(agentId: string, query: string) {
     enabled: !!agentId && query.length > 0,
   });
 }
+
+export function useSessionReport(agentId: string) {
+  return useQuery({
+    queryKey: ['knowledge', agentId, 'session-report'],
+    queryFn: () => apiFetch<{ content: string }>(`/knowledge/${agentId}/session-report`),
+    enabled: !!agentId,
+    retry: false,
+  });
+}
+
+export function useSkillDiff(agentId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['knowledge', agentId, 'skill-diff'],
+    queryFn: () => apiFetch<{ old_content: string | null; new_content: string }>(`/knowledge/${agentId}/skill-diff`),
+    enabled: !!agentId && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useDigestDiff(agentId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['knowledge', agentId, 'digest-diff'],
+    queryFn: () => apiFetch<{ old_content: string | null; new_content: string }>(`/knowledge/${agentId}/digest-diff`),
+    enabled: !!agentId && (options?.enabled ?? true),
+    retry: false,
+  });
+}
