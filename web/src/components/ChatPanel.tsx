@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { streamQuery, type ChatMessage } from '../api/query';
 
-export default function ChatPanel({ agentId }: { agentId: string }) {
+export default function ChatPanel({ agentId, soul }: { agentId: string; soul?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -72,118 +73,147 @@ export default function ChatPanel({ agentId }: { agentId: string }) {
     }
   };
 
+  const subtitle = soul?.split(/[.!?]/)[0]?.trim() ?? "Questions are answered from your agent's accumulated knowledge.";
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center py-16">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: 'var(--color-accent-glow)', border: '1px solid var(--color-accent-dim)' }}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
+    /* paddingTop: 72 reserves space below the floating header in the parent */
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingTop: 72 }}>
+
+      {/* Scrollable messages area */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {messages.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', paddingBottom: 48 }}>
+            {/* 80px gradient circle icon */}
+            <div style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(79,127,255,0.20) 0%, rgba(79,127,255,0.06) 100%)',
+              border: '1px solid var(--color-accent-dim)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Ask your expert anything</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Questions are answered from accumulated knowledge</p>
+
+            <h2 style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text-primary)', marginTop: 20, marginBottom: 0, textAlign: 'center' }}>
+              How can I assist <em style={{ fontStyle: 'italic' }}>today?</em>
+            </h2>
+
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', maxWidth: 400, textAlign: 'center', lineHeight: 1.6, marginTop: 10, marginBottom: 0 }}>
+              {subtitle}
+            </p>
+          </div>
+        ) : (
+          <div style={{ padding: '16px 32px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {messages.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', gap: 12, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  {msg.role === 'assistant' && (
+                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'var(--color-accent-glow)', border: '1px solid var(--color-accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                  )}
+
+                  <div style={{ maxWidth: '78%', display: 'flex', flexDirection: 'column', gap: 8, alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div
+                      className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                      style={
+                        msg.role === 'user'
+                          ? { backgroundColor: 'var(--color-accent)', color: '#fff', borderBottomRightRadius: 4 }
+                          : { backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: 4 }
+                      }
+                    >
+                      {msg.content === '' && msg.role === 'assistant' ? (
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 16 }}>
+                          {[0, 1, 2].map(j => (
+                            <span
+                              key={j}
+                              className="w-1.5 h-1.5 rounded-full animate-bounce"
+                              style={{ backgroundColor: 'var(--color-text-secondary)', animationDelay: `${j * 0.15}s` }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.content}</p>
+                      )}
+                    </div>
+
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {msg.sources.map(s => (
+                          <span
+                            key={s}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontFamily: 'var(--font-mono)', borderRadius: 6, padding: '2px 8px', backgroundColor: 'var(--color-surface-2)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-subtle)' }}
+                          >
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {s.split('/').pop()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {msg.role === 'user' && (
+                    <div style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'var(--color-surface-3)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-text-secondary)' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
+            <div ref={bottomRef} />
           </div>
         )}
-
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'assistant' && (
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                style={{ backgroundColor: 'var(--color-accent-glow)', border: '1px solid var(--color-accent-dim)' }}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-            )}
-
-            <div className={`max-w-[78%] flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div
-                className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
-                style={
-                  msg.role === 'user'
-                    ? { backgroundColor: 'var(--color-accent)', color: '#fff', borderBottomRightRadius: '4px' }
-                    : { backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-subtle)', borderBottomLeftRadius: '4px' }
-                }
-              >
-                {msg.content === '' && msg.role === 'assistant' ? (
-                  <div className="flex gap-1 items-center h-4">
-                    {[0, 1, 2].map(j => (
-                      <span
-                        key={j}
-                        className="w-1.5 h-1.5 rounded-full animate-bounce"
-                        style={{ backgroundColor: 'var(--color-text-secondary)', animationDelay: `${j * 0.15}s` }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                )}
-              </div>
-
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="flex flex-wrap gap-1 px-1">
-                  {msg.sources.map(s => (
-                    <span
-                      key={s}
-                      className="inline-flex items-center gap-1 text-[10px] rounded-md px-2 py-0.5"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        backgroundColor: 'var(--color-surface-2)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border-subtle)',
-                      }}
-                    >
-                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-accent)' }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      {s.split('/').pop()}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {msg.role === 'user' && (
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                style={{ backgroundColor: 'var(--color-surface-3)', border: '1px solid var(--color-border-default)' }}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-text-secondary)' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-            )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4" style={{ borderTop: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-surface-1)' }}>
-        <div className="flex gap-3 items-end">
+      {/* Floating pill input */}
+      <div style={{ padding: '0 24px 28px', flexShrink: 0 }}>
+        <p style={{ textAlign: 'center', fontSize: 10, color: 'var(--color-text-muted)', marginBottom: 8, marginTop: 0, fontFamily: 'var(--font-mono)' }}>
+          Press ↵ to send · ⇧↵ for newline
+        </p>
+        <div style={{
+          maxWidth: 680,
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          backgroundColor: 'var(--color-surface-1)',
+          border: `1px solid ${inputFocused ? 'var(--color-accent)' : 'var(--color-border-default)'}`,
+          borderRadius: 99,
+          padding: '8px 8px 8px 16px',
+          transition: 'border-color 150ms',
+        }}>
+          {/* Chat icon */}
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+
           <textarea
             ref={inputRef}
             rows={1}
-            className="flex-1 rounded-xl px-4 py-2.5 text-sm placeholder:text-[--color-text-muted] focus:outline-none resize-none overflow-hidden leading-relaxed transition-colors duration-150"
             style={{
-              backgroundColor: 'var(--color-surface-2)',
-              border: '1px solid var(--color-border-default)',
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
               color: 'var(--color-text-primary)',
+              resize: 'none',
+              outline: 'none',
+              fontSize: 14,
               fontFamily: 'var(--font-sans)',
+              lineHeight: 1.5,
+              padding: 0,
             }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
-            placeholder="Ask your expert... (Enter to send, Shift+Enter for newline)"
+            placeholder="Ask anything..."
             value={input}
             onChange={e => {
               setInput(e.target.value);
@@ -191,22 +221,36 @@ export default function ChatPanel({ agentId }: { agentId: string }) {
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
             }}
             onKeyDown={handleKeyDown}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             disabled={loading}
           />
+
+          {/* Circular send button */}
           <button
             onClick={send}
             disabled={loading || !input.trim()}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium transition-colors shrink-0 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ backgroundColor: 'var(--color-accent)', color: '#fff' }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-accent)',
+              color: '#fff',
+              border: 'none',
+              cursor: loading || !input.trim() ? 'default' : 'pointer',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: loading || !input.trim() ? 0.45 : 1,
+              transition: 'opacity 150ms',
+            }}
           >
             {loading ? (
-              <div
-                className="w-4 h-4 border-2 rounded-full animate-spin"
-                style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }}
-              />
+              <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} />
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
               </svg>
             )}
           </button>

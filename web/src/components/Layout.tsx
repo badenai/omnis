@@ -245,13 +245,13 @@ export default function Layout() {
         <main
           style={{
             flex: 1,
-            overflow: 'auto',
+            overflow: 'hidden',
             backgroundColor: 'var(--color-surface-0)',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <div style={{ width: '100%', maxWidth: 1280, margin: '0 auto', padding: '32px' }}>
-            <Outlet />
-          </div>
+          <Outlet />
         </main>
       </div>
 

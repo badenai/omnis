@@ -69,10 +69,15 @@ function InboxCard({ item }: CardProps) {
 
   return (
     <div
-      className="rounded-xl p-4 space-y-3"
       style={{
         backgroundColor: 'var(--color-surface-2)',
         border: '1px solid var(--color-border-subtle)',
+        borderLeft: `3px solid ${scoreColor(item.relevanceScore)}`,
+        borderRadius: 8,
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
       }}
     >
       {/* Top row: timestamp + channel */}

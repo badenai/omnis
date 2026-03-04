@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useUpdateSoul } from '../api/agents';
-import { useSoulSuggestions } from '../api/scheduler';
 
 interface Props {
   agentId: string;
@@ -11,7 +10,6 @@ export default function SoulEditor({ agentId, initialSoul }: Props) {
   const [soul, setSoul] = useState(initialSoul);
   const updateSoul = useUpdateSoul(agentId);
   const [message, setMessage] = useState('');
-  const { data: suggestionsData, refetch: refetchSuggestions, isFetching } = useSoulSuggestions(agentId);
 
   const handleSave = async () => {
     setMessage('');
@@ -23,69 +21,43 @@ export default function SoulEditor({ agentId, initialSoul }: Props) {
     }
   };
 
-  const monoLabel: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '9px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    color: 'var(--color-text-muted)',
-    marginBottom: '6px',
-    fontWeight: 500,
-  };
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <textarea
-          value={soul}
-          onChange={(e) => setSoul(e.target.value)}
-          className="w-full h-[45vh] bg-gray-900 border border-gray-700 rounded px-4 py-3 text-sm font-mono focus:outline-none focus:border-indigo-500 resize-none"
-          placeholder="Write SOUL.md content here..."
-        />
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={updateSoul.isPending}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded text-sm font-medium transition-colors"
-          >
-            {updateSoul.isPending ? 'Saving...' : 'Save Soul'}
-          </button>
-          {message && (
-            <span className={`text-sm ${message.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
-              {message}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div
-        className="rounded-lg p-4"
-        style={{ backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)' }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div style={monoLabel}>AI Suggestions</div>
-          <button
-            onClick={() => refetchSuggestions()}
-            disabled={isFetching}
-            className="px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-default)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
-          >
-            {isFetching ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
-        {suggestionsData?.suggestions ? (
-          <pre
-            className="text-xs whitespace-pre-wrap leading-relaxed"
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', maxHeight: '240px', overflowY: 'auto' }}
-          >
-            {suggestionsData.suggestions}
-          </pre>
-        ) : (
-          <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {isFetching ? 'Fetching suggestions...' : 'No suggestions yet. Run a consolidation to generate them.'}
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <textarea
+        value={soul}
+        onChange={(e) => setSoul(e.target.value)}
+        placeholder="Write SOUL.md content here..."
+        style={{
+          width: '100%',
+          height: '40vh',
+          backgroundColor: 'var(--color-surface-2)',
+          border: '1px solid var(--color-border-default)',
+          borderRadius: 8,
+          padding: '12px 14px',
+          fontSize: 13,
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--color-text-primary)',
+          outline: 'none',
+          resize: 'vertical',
+          boxSizing: 'border-box',
+        }}
+        onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+        onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          onClick={handleSave}
+          disabled={updateSoul.isPending}
+          style={{ padding: '7px 16px', fontSize: 13, fontWeight: 500, borderRadius: 8, border: 'none', cursor: 'pointer', backgroundColor: 'var(--color-accent)', color: '#fff', opacity: updateSoul.isPending ? 0.5 : 1, transition: 'background 150ms' }}
+          onMouseEnter={(e) => { if (!updateSoul.isPending) e.currentTarget.style.backgroundColor = 'var(--color-accent-dim)'; }}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-accent)')}
+        >
+          {updateSoul.isPending ? 'Saving...' : 'Save Soul'}
+        </button>
+        {message && (
+          <span style={{ fontSize: 13, color: message.startsWith('Error') ? 'var(--color-status-error)' : 'var(--color-status-ok)' }}>
+            {message}
+          </span>
         )}
       </div>
     </div>

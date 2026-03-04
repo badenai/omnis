@@ -3,43 +3,70 @@ import type { ChannelSource } from '../types';
 interface Props {
   channels: ChannelSource[];
   onChange: (channels: ChannelSource[]) => void;
+  onSync?: (handle: string) => void;
 }
 
-export default function ChannelList({ channels, onChange }: Props) {
+export default function ChannelList({ channels, onChange, onSync }: Props) {
   const add = () => onChange([...channels, { handle: '' }]);
-
-  const update = (i: number, value: string) => {
-    const next = [...channels];
-    next[i] = { handle: value };
-    onChange(next);
-  };
-
+  const update = (i: number, value: string) => { const next = [...channels]; next[i] = { handle: value }; onChange(next); };
   const remove = (i: number) => onChange(channels.filter((_, idx) => idx !== i));
 
+  const inputStyle: React.CSSProperties = {
+    flex: 1,
+    backgroundColor: 'var(--color-surface-2)',
+    border: '1px solid var(--color-border-default)',
+    borderRadius: 6,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--color-text-primary)',
+    outline: 'none',
+  };
+
   return (
-    <div className="space-y-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {channels.map((ch, i) => (
-        <div key={i} className="flex gap-2 items-center">
+        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {onSync && (
+            <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-ok)', flexShrink: 0 }} />
+          )}
           <input
             type="text"
             value={ch.handle}
             onChange={(e) => update(i, e.target.value)}
             placeholder="@ChannelHandle"
-            className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+            style={inputStyle}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
           />
+          {onSync && ch.handle && (
+            <button
+              type="button"
+              onClick={() => onSync(ch.handle)}
+              style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)', borderRadius: 6, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer', flexShrink: 0 }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+            >
+              SYNC
+            </button>
+          )}
           <button
             type="button"
             onClick={() => remove(i)}
-            className="px-2 py-2 text-red-400 hover:text-red-300 text-sm"
+            style={{ padding: '5px 8px', fontSize: 12, borderRadius: 6, border: 'none', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', flexShrink: 0 }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-status-error)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-muted)')}
           >
-            x
+            ×
           </button>
         </div>
       ))}
       <button
         type="button"
         onClick={add}
-        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded text-xs font-medium text-gray-400 transition-colors"
+        style={{ alignSelf: 'flex-start', padding: '5px 10px', fontSize: 11, fontFamily: 'var(--font-mono)', borderRadius: 6, border: '1px solid var(--color-border-subtle)', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-muted)')}
       >
         + Add Channel
       </button>

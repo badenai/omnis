@@ -125,7 +125,6 @@ export default function AgentForm({ agent }: Props) {
         await updateConfig.mutateAsync({
           model,
           analysis_mode: analysisMode,
-          sources: { youtube_channels: channels },
           consolidation_schedule: timeToCron(runTime),
           decay: { half_life_days: halfLife },
           collection_model: collectionModel,
@@ -206,9 +205,11 @@ export default function AgentForm({ agent }: Props) {
         </Field>
       </div>
 
-      <Field label="YouTube Channels" tooltip="List of YouTube channel @handles to watch. The agent fetches new videos from each channel on every daily run and skips ones it has already processed.">
-        <ChannelList channels={channels} onChange={setChannels} />
-      </Field>
+      {!isEdit && (
+        <Field label="YouTube Channels" tooltip="List of YouTube channel @handles to watch. The agent fetches new videos from each channel on every daily run and skips ones it has already processed.">
+          <ChannelList channels={channels} onChange={setChannels} />
+        </Field>
+      )}
 
       <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
         <StyledInput

@@ -23,6 +23,7 @@ export default function JobList() {
   );
 
   return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: 32 }}>
     <div className="space-y-6">
       {/* Page header */}
       <div>
@@ -114,6 +115,7 @@ export default function JobList() {
           </table>
         </div>
       )}
+    </div>
     </div>
   );
 }

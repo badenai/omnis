@@ -58,27 +58,27 @@ function DiffPane({
 }) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-text-muted)' }}>
         <span className="text-sm">Loading...</span>
       </div>
     );
   }
   if (isError) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-status-error)' }}>
+      <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-status-error)' }}>
         <span className="text-sm">Failed to load diff.</span>
       </div>
     );
   }
   if (!data) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-text-muted)' }}>
         <span className="text-sm">No data yet. Run a consolidation to see results here.</span>
       </div>
     );
   }
   return (
-    <div className="overflow-auto h-full">
+    <div className="overflow-auto" style={{ minHeight: 360 }}>
       {data.old_content === null && (
         <div
           className="px-4 py-2 text-xs mb-2 rounded-lg"
@@ -114,7 +114,7 @@ export default function SessionPanel({ agentId }: Props) {
   const { data: digestDiff, isLoading: digestLoading, isError: digestError } = useDigestDiff(agentId, { enabled: tab === 'digest' });
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Tab bar */}
       <div
         role="tablist"
@@ -144,24 +144,26 @@ export default function SessionPanel({ agentId }: Props) {
       <div
         id={`session-tabpanel-${tab}`}
         role="tabpanel"
-        className="flex-1 min-h-0 overflow-auto border rounded-lg"
-        style={{ borderColor: 'var(--color-border-subtle)', backgroundColor: 'var(--color-surface-2)' }}
+        className="border rounded-lg overflow-hidden"
+        style={{ borderColor: 'var(--color-border-subtle)', backgroundColor: 'var(--color-surface-2)', minHeight: 360 }}
       >
         {tab === 'report' && (
           reportLoading ? (
-            <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-text-muted)' }}>
               <span className="text-sm">Loading...</span>
             </div>
           ) : reportError ? (
-            <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-status-error)' }}>
+            <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-status-error)' }}>
               <span className="text-sm">Failed to load session report.</span>
             </div>
           ) : reportData ? (
-            <div className="p-4 prose prose-invert prose-sm max-w-none prose-headings:text-gray-100 prose-p:text-gray-300 prose-strong:text-gray-100 prose-code:text-indigo-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700 prose-table:text-sm prose-th:text-gray-300 prose-td:text-gray-400 prose-a:text-indigo-400 prose-li:text-gray-300 prose-blockquote:border-indigo-500 prose-blockquote:text-gray-400 prose-hr:border-gray-700">
-              <Markdown remarkPlugins={[remarkGfm]}>{reportData.content}</Markdown>
+            <div style={{ margin: 16, backgroundColor: 'var(--color-surface-1)', borderRadius: 10, padding: '20px 24px' }}>
+              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-gray-100 prose-p:text-gray-300 prose-strong:text-gray-100 prose-code:text-indigo-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700 prose-table:text-sm prose-th:text-gray-300 prose-td:text-gray-400 prose-a:text-indigo-400 prose-li:text-gray-300 prose-blockquote:border-indigo-500 prose-blockquote:text-gray-400 prose-hr:border-gray-700">
+                <Markdown remarkPlugins={[remarkGfm]}>{reportData.content}</Markdown>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="flex items-center justify-center" style={{ minHeight: 360, color: 'var(--color-text-muted)' }}>
               <span className="text-sm">No session yet. Run a consolidation to see results here.</span>
             </div>
           )

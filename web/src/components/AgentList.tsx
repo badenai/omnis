@@ -79,6 +79,7 @@ export default function AgentList() {
   const needsAttention = agentList.filter((a) => a.inbox_count > 0).length;
 
   return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: 32 }}>
     <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-end justify-between">
@@ -273,6 +274,7 @@ export default function AgentList() {
           })}
         </div>
       )}
+    </div>
     </div>
   );
 }
