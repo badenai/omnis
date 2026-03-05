@@ -10,3 +10,13 @@ build/
 venv/
 web/node_modules/
 web/dist/
+
+# CI deploy config
+.ci.env
+
+# Terraform
+deploy/terraform/terraform.tfvars
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.backup
+deploy/terraform/.terraform.lock.hcl

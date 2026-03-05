@@ -1,0 +1,19 @@
+proxmox_endpoint     = "https://192.168.1.200:8006"
+proxmox_api_token    = "root@pam!terraform=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+proxmox_node         = "omniserve"
+proxmox_ssh_host     = "192.168.1.200"
+
+# Omnis container (VLAN 20)
+container_id         = 200
+container_ip         = "192.168.20.10/24"
+container_host       = "192.168.20.10"
+gateway              = "192.168.20.1"
+git_repo             = "git@github.com:badenai/omnis.git"
+
+# Caddy reverse proxy container (VLAN 20)
+caddy_container_id   = 201
+caddy_container_ip   = "192.168.20.2/24"
+caddy_container_host = "192.168.20.2"
+
+# Public domain
+domain               = "omnis.yourdomain.com"

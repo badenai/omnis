@@ -1,0 +1,13 @@
+[Unit]
+Description=Omnis API
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/omnis
+ExecStart=/root/.local/bin/uv run uvicorn api.app:create_app \
+  --factory --host 127.0.0.1 --port 8420
+Restart=on-failure
+EnvironmentFile=/opt/omnis/.env
+
+[Install]
+WantedBy=multi-user.target
