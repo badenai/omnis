@@ -127,6 +127,13 @@ resource "proxmox_virtual_environment_container" "caddy" {
 resource "null_resource" "omnis_bootstrap" {
   depends_on = [proxmox_virtual_environment_container.omnis]
 
+  triggers = {
+    script_hash    = sha256(templatefile("${path.module}/scripts/omnis-bootstrap.sh.tpl", {
+      gemini_api_key = var.gemini_api_key
+    }))
+    container_id   = proxmox_virtual_environment_container.omnis.id
+  }
+
   connection {
     type        = "ssh"
     host        = var.proxmox_ssh_host
@@ -136,24 +143,14 @@ resource "null_resource" "omnis_bootstrap" {
 
   provisioner "file" {
     content = templatefile("${path.module}/scripts/omnis-bootstrap.sh.tpl", {
-      git_repo       = var.git_repo
       gemini_api_key = var.gemini_api_key
     })
     destination = "/tmp/omnis-bootstrap.sh"
   }
 
-  provisioner "file" {
-    source      = pathexpand(var.github_ssh_key)
-    destination = "/tmp/github_deploy_key"
-  }
-
   provisioner "remote-exec" {
     inline = [
-      "pct exec ${var.container_id} -- mkdir -p /root/.ssh",
-      "pct exec ${var.container_id} -- chmod 700 /root/.ssh",
       "pct push ${var.container_id} /tmp/omnis-bootstrap.sh /tmp/bootstrap.sh",
-      "pct push ${var.container_id} /tmp/github_deploy_key /root/.ssh/github_deploy_key",
-      "pct exec ${var.container_id} -- chmod 600 /root/.ssh/github_deploy_key",
       "pct exec ${var.container_id} -- bash /tmp/bootstrap.sh",
     ]
   }
@@ -162,6 +159,15 @@ resource "null_resource" "omnis_bootstrap" {
 # Bootstrap Caddy — runs on Proxmox host via SSH, no SSH needed inside container
 resource "null_resource" "caddy_bootstrap" {
   depends_on = [proxmox_virtual_environment_container.caddy]
+
+  triggers = {
+    script_hash  = sha256(templatefile("${path.module}/scripts/caddy-bootstrap.sh.tpl", {
+      domain   = var.domain
+      omnis_ip = var.container_host
+      users    = var.caddy_users
+    }))
+    container_id = proxmox_virtual_environment_container.caddy.id
+  }
 
   connection {
     type        = "ssh"
@@ -174,6 +180,7 @@ resource "null_resource" "caddy_bootstrap" {
     content = templatefile("${path.module}/scripts/caddy-bootstrap.sh.tpl", {
       domain   = var.domain
       omnis_ip = var.container_host
+      users    = var.caddy_users
     })
     destination = "/tmp/caddy-bootstrap.sh"
   }

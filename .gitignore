@@ -12,7 +12,7 @@ web/node_modules/
 web/dist/
 
 # CI deploy config
-.ci.env
+deploy/.ci.env
 
 # Terraform
 deploy/terraform/terraform.tfvars

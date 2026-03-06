@@ -36,17 +36,6 @@ variable "gateway" {
   description = "Network gateway IP, e.g. 192.168.20.1"
 }
 
-variable "git_repo" {
-  type        = string
-  description = "Git repo URL to clone, e.g. git@github.com:you/omnis.git"
-}
-
-variable "github_ssh_key" {
-  type        = string
-  sensitive   = true
-  description = "Path to SSH private key for GitHub access, e.g. ~/.ssh/id_ed25519_github"
-  default     = "~/.ssh/id_ed25519_github"
-}
 
 variable "gemini_api_key" {
   type        = string
@@ -78,4 +67,11 @@ variable "caddy_container_host" {
 variable "domain" {
   type        = string
   description = "Public domain name for Omnis, e.g. omnis.yourdomain.com"
+}
+
+variable "caddy_users" {
+  type        = map(string)
+  sensitive   = true
+  description = "Map of username to Caddy bcrypt hash. Generate with: caddy hash-password"
+  default     = {}
 }

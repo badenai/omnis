@@ -13,8 +13,16 @@ fi
 
 cat > /etc/caddy/Caddyfile << 'EOF'
 ${domain} {
+%{ if length(users) > 0 ~}
+    basicauth {
+%{ for username, hash in users ~}
+        ${username} ${hash}
+%{ endfor ~}
+    }
+%{ endif ~}
     reverse_proxy ${omnis_ip}:8420
 }
 EOF
 
-systemctl enable --now caddy
+systemctl enable caddy
+systemctl reload-or-restart caddy
