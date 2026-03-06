@@ -4,13 +4,17 @@ set -e
 apt-get update -q && apt-get install -y git curl
 
 # Trust GitHub host key and configure deploy key
-ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
-cat > ~/.ssh/config << 'EOF'
+mkdir -p /root/.ssh
+chmod 700 /root/.ssh
+ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts
+chmod 600 /root/.ssh/known_hosts
+cat > /root/.ssh/config << 'EOF'
 Host github.com
-    IdentityFile ~/.ssh/github_deploy_key
+    IdentityFile /root/.ssh/github_deploy_key
     StrictHostKeyChecking no
 EOF
-chmod 600 ~/.ssh/config
+chmod 600 /root/.ssh/config
+
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
@@ -25,4 +29,7 @@ cd /opt/omnis && /root/.local/bin/uv sync
 cp /opt/omnis/deploy/omnis.service /etc/systemd/system/omnis.service
 systemctl daemon-reload
 systemctl enable omnis
+
+echo "GEMINI_API_KEY=${gemini_api_key}" > /opt/omnis/.env
+
 systemctl restart omnis

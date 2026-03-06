@@ -48,6 +48,12 @@ variable "github_ssh_key" {
   default     = "~/.ssh/id_ed25519_github"
 }
 
+variable "gemini_api_key" {
+  type        = string
+  sensitive   = true
+  description = "Google Gemini API key"
+}
+
 variable "proxmox_ssh_host" {
   type        = string
   description = "Proxmox host bare IP for SSH, e.g. 192.168.1.200"

@@ -136,7 +136,8 @@ resource "null_resource" "omnis_bootstrap" {
 
   provisioner "file" {
     content = templatefile("${path.module}/scripts/omnis-bootstrap.sh.tpl", {
-      git_repo = var.git_repo
+      git_repo       = var.git_repo
+      gemini_api_key = var.gemini_api_key
     })
     destination = "/tmp/omnis-bootstrap.sh"
   }
@@ -148,6 +149,8 @@ resource "null_resource" "omnis_bootstrap" {
 
   provisioner "remote-exec" {
     inline = [
+      "pct exec ${var.container_id} -- mkdir -p /root/.ssh",
+      "pct exec ${var.container_id} -- chmod 700 /root/.ssh",
       "pct push ${var.container_id} /tmp/omnis-bootstrap.sh /tmp/bootstrap.sh",
       "pct push ${var.container_id} /tmp/github_deploy_key /root/.ssh/github_deploy_key",
       "pct exec ${var.container_id} -- chmod 600 /root/.ssh/github_deploy_key",
