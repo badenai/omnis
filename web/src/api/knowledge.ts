@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { KnowledgeFile, KnowledgeFileContent } from '../types';
+import type { KnowledgeFile, KnowledgeFileContent, QualityHistory } from '../types';
 
 export function useKnowledge(agentId: string) {
   return useQuery({
@@ -73,6 +73,15 @@ export function useDigestDiff(agentId: string, options?: { enabled?: boolean }) 
     queryKey: ['knowledge', agentId, 'digest-diff'],
     queryFn: () => apiFetch<{ old_content: string | null; new_content: string }>(`/knowledge/${agentId}/digest-diff`),
     enabled: !!agentId && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useSkillQuality(agentId: string) {
+  return useQuery({
+    queryKey: ['knowledge', agentId, 'quality'],
+    queryFn: () => apiFetch<QualityHistory>(`/knowledge/${agentId}/quality`),
+    enabled: !!agentId,
     retry: false,
   });
 }

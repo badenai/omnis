@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile, File, Form
 
-from core.config import load_agent_config, load_soul, save_agent_config, save_soul
+from core.config import load_agent_config, load_soul, save_agent_config, save_soul, save_soul_backup, restore_soul_backup
 from core.agent_loader import load_agent
 from core.scheduler import build_scheduler
 from core.scheduler_instance import get_scheduler
@@ -19,6 +19,7 @@ from api.schemas import (
     AgentSummary,
     IngestChannelExecuteRequest,
     IngestUrlRequest,
+    SoulIntegrateRequest,
     SoulUpdate,
     SourceStats,
 )
@@ -44,6 +45,11 @@ def _agent_summary(agent: dict) -> AgentSummary:
     kw = KnowledgeWriter(agent_dir, config.decay.get("half_life_days", 365))
     knowledge_files = kw.load_all_weighted()
 
+    from core.skill_quality import SkillQualityStore
+    store = SkillQualityStore(agent_dir)
+    latest_score = store.latest_score()
+    quality_alert = store.is_alert(config.skill_eval.min_quality_threshold)
+
     return AgentSummary(
         agent_id=config.agent_id,
         model=config.model,
@@ -54,6 +60,8 @@ def _agent_summary(agent: dict) -> AgentSummary:
         inbox_count=len(inbox.read_items()),
         knowledge_count=len(knowledge_files),
         self_improving=config.self_improving,
+        latest_quality_score=latest_score,
+        quality_alert=quality_alert,
     )
 
 
@@ -68,6 +76,12 @@ def _agent_detail(agent: dict) -> AgentDetail:
     raw_source_stats = state._data.get("source_stats", {})
     source_stats = {sid: SourceStats(**s) for sid, s in raw_source_stats.items()}
 
+    from core.skill_quality import SkillQualityStore
+    from api.schemas import SkillEvalConfig as SkillEvalConfigSchema
+    store = SkillQualityStore(agent_dir)
+    latest_score = store.latest_score()
+    quality_alert = store.is_alert(config.skill_eval.min_quality_threshold)
+
     return AgentDetail(
         agent_id=config.agent_id,
         model=config.model,
@@ -79,11 +93,19 @@ def _agent_detail(agent: dict) -> AgentDetail:
         consolidation_model=config.consolidation_model,
         soul=agent["soul"],
         self_improving=config.self_improving,
+        skill_eval=SkillEvalConfigSchema(
+            prompts=config.skill_eval.prompts,
+            min_quality_threshold=config.skill_eval.min_quality_threshold,
+            enabled=config.skill_eval.enabled,
+        ),
         last_checked=state.last_checked,
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
         knowledge_count=len(knowledge_files),
         source_stats=source_stats,
+        latest_quality_score=latest_score,
+        quality_alert=quality_alert,
+        has_soul_backup=(agent_dir / "soul_backup.md").exists(),
     )
 
 
@@ -140,6 +162,7 @@ def create_agent(body: AgentConfigCreate, request: Request):
         "collection_model": body.collection_model,
         "consolidation_model": body.consolidation_model,
         "self_improving": body.self_improving,
+        "skill_eval": body.skill_eval.model_dump(),
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
     save_soul(agent_dir, body.soul)
@@ -184,6 +207,14 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
         "collection_model": body.collection_model if body.collection_model is not None else config.collection_model,
         "consolidation_model": body.consolidation_model if body.consolidation_model is not None else config.consolidation_model,
         "self_improving": body.self_improving if body.self_improving is not None else config.self_improving,
+        "skill_eval": (
+            body.skill_eval.model_dump() if body.skill_eval is not None
+            else {
+                "prompts": config.skill_eval.prompts,
+                "min_quality_threshold": config.skill_eval.min_quality_threshold,
+                "enabled": config.skill_eval.enabled,
+            }
+        ),
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
 
@@ -204,6 +235,7 @@ def update_soul(agent_id: str, body: SoulUpdate, request: Request):
 
     agent = agents[agent_id]
     agent_dir = agent["dir"]
+    save_soul_backup(agent_dir, agent["soul"])
     save_soul(agent_dir, body.soul)
 
     # Reload agent to pick up new soul
@@ -212,6 +244,35 @@ def update_soul(agent_id: str, body: SoulUpdate, request: Request):
     agents[agent_id] = new_agent
     _reschedule_agent(new_agent)
     logger.info(f"Updated soul for agent: {agent_id}")
+    return _agent_detail(new_agent)
+
+
+@router.post("/{agent_id}/soul/integrate")
+def integrate_soul(agent_id: str, body: SoulIntegrateRequest, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent = agents[agent_id]
+    integrated = agent["provider"].integrate_soul_suggestions(body.soul, body.suggestions)
+    return {"integrated_soul": integrated}
+
+
+@router.post("/{agent_id}/soul/revert", response_model=AgentDetail)
+def revert_soul(agent_id: str, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent = agents[agent_id]
+    agent_dir = agent["dir"]
+    backup = restore_soul_backup(agent_dir)
+    if backup is None:
+        raise HTTPException(404, "No backup available")
+    save_soul(agent_dir, backup)
+    (agent_dir / "soul_backup.md").unlink()
+    gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+    new_agent = load_agent(agent_dir, gemini_api_key=gemini_api_key)
+    agents[agent_id] = new_agent
+    _reschedule_agent(new_agent)
     return _agent_detail(new_agent)
 
 

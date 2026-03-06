@@ -13,6 +13,20 @@ def is_channel_url(url: str) -> bool:
     return bool(_CHANNEL_PATTERN.search(url.split("?")[0]))
 
 
+def _videos_url(url: str) -> str:
+    """Normalise a channel URL to point at the /videos tab.
+
+    Passing a bare channel URL (e.g. youtube.com/c/Foo or youtube.com/@Foo)
+    to yt_dlp returns the channel *tabs* as top-level entries rather than the
+    actual videos.  Appending /videos forces yt_dlp to fetch only the video
+    uploads playlist.
+    """
+    clean = url.rstrip("/").split("?")[0]
+    if not clean.endswith("/videos"):
+        clean += "/videos"
+    return clean
+
+
 def get_channel_videos(url: str, limit: int | None = None) -> list[dict]:
     """Fetch video metadata from a channel URL.
 
@@ -28,7 +42,7 @@ def get_channel_videos(url: str, limit: int | None = None) -> list[dict]:
         opts["playlistend"] = limit
 
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info = ydl.extract_info(_videos_url(url), download=False)
 
     entries = info.get("entries") or [] if info else []
     result = []

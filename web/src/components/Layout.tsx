@@ -74,7 +74,7 @@ export default function Layout() {
         {/* Sidebar */}
         <nav
           style={{
-            width: 240,
+            width: 56,
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -83,9 +83,9 @@ export default function Layout() {
           }}
         >
           {/* Logo */}
-          <div style={{ padding: '20px', borderBottom: '1px solid var(--color-border-subtle)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ padding: '12px 0', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'center' }}>
+            <div>
+              <div style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                   <defs>
                     <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -127,20 +127,16 @@ export default function Layout() {
                   )}
                 </svg>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 600, lineHeight: 1, color: 'var(--color-text-primary)' }}>
-                Omnis
-              </div>
             </div>
           </div>
 
           {/* Nav */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '12px', marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 6px', marginTop: 4 }}>
             <NavLink
               to="/"
               end
-              className={({ isActive }) =>
-                `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${isActive ? 'font-medium' : ''}`
-              }
+              title="Agents"
+              className={() => `group relative flex items-center justify-center py-2.5 rounded-md transition-colors duration-150`}
               style={({ isActive }) => ({
                 color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
@@ -151,18 +147,17 @@ export default function Layout() {
                   {isActive && (
                     <span
                       style={{
-                        position: 'absolute', left: 0, top: 4, bottom: 4,
+                        position: 'absolute', left: 0, top: '20%', bottom: '20%',
                         width: 2, borderRadius: 999, backgroundColor: 'var(--color-accent)',
                       }}
                     />
                   )}
                   <AgentsIcon />
-                  <span>Agents</span>
                   {activeCount > 0 && (
-                    <span style={{ marginLeft: 'auto' }}>
+                    <span style={{ position: 'absolute', top: 5, right: 6 }}>
                       <span
                         className="animate-pulse"
-                        style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-active)' }}
+                        style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-status-active)' }}
                       />
                     </span>
                   )}
@@ -172,9 +167,8 @@ export default function Layout() {
 
             <NavLink
               to="/jobs"
-              className={({ isActive }) =>
-                `group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${isActive ? 'font-medium' : ''}`
-              }
+              title="Scheduler"
+              className={() => `group relative flex items-center justify-center py-2.5 rounded-md transition-colors duration-150`}
               style={({ isActive }) => ({
                 color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 backgroundColor: isActive ? 'var(--color-surface-3)' : 'transparent',
@@ -185,13 +179,12 @@ export default function Layout() {
                   {isActive && (
                     <span
                       style={{
-                        position: 'absolute', left: 0, top: 4, bottom: 4,
+                        position: 'absolute', left: 0, top: '20%', bottom: '20%',
                         width: 2, borderRadius: 999, backgroundColor: 'var(--color-accent)',
                       }}
                     />
                   )}
                   <SchedulerIcon />
-                  <span>Scheduler</span>
                 </>
               )}
             </NavLink>
@@ -202,11 +195,13 @@ export default function Layout() {
           {/* Training Log toggle button */}
           <button
             onClick={() => setDrawerOpen(v => !v)}
+            title={activeCount > 0 ? `${activeCount} running` : 'Training Log'}
             style={{
+              position: 'relative',
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '11px 16px',
+              justifyContent: 'center',
+              padding: '14px 0',
               width: '100%',
               background: drawerOpen ? 'var(--color-surface-3)' : 'transparent',
               border: 'none',
@@ -214,7 +209,6 @@ export default function Layout() {
               cursor: 'pointer',
               color: activeCount > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
               transition: 'background 150ms, color 150ms',
-              textAlign: 'left',
             }}
             onMouseEnter={e => {
               if (!drawerOpen) (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-2)';
@@ -228,16 +222,12 @@ export default function Layout() {
             <span style={{ color: activeCount > 0 ? 'var(--color-accent)' : 'inherit' }}>
               <TerminalIcon />
             </span>
-            <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', flex: 1, letterSpacing: '0.02em' }}>
-              {activeCount > 0 ? `${activeCount} running` : 'Training Log'}
-            </span>
             {activeCount > 0 && (
               <span
                 className="animate-pulse"
-                style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-active)', flexShrink: 0 }}
+                style={{ position: 'absolute', top: 8, right: 8, width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--color-status-active)' }}
               />
             )}
-            <ChevronUpIcon flipped={drawerOpen} />
           </button>
         </nav>
 

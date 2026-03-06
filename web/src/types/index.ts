@@ -2,6 +2,33 @@ export interface ChannelSource {
   handle: string;
 }
 
+export interface SkillEvalConfig {
+  prompts: string[];
+  min_quality_threshold: number;
+  enabled: boolean;
+}
+
+export interface PromptEvalResult {
+  prompt: string;
+  with_skill_score: number;
+  without_skill_score: number;
+  delta: number;
+  grader_reasoning: string;
+}
+
+export interface QualityHistoryEntry {
+  score: number;
+  skill_version: string;
+  timestamp: string;
+  eval_results: PromptEvalResult[];
+}
+
+export interface QualityHistory {
+  history: QualityHistoryEntry[];
+  latest_score: number | null;
+  alert: boolean;
+}
+
 export interface AgentSources {
   youtube_channels: ChannelSource[];
 }
@@ -20,6 +47,8 @@ export interface AgentSummary {
   inbox_count: number;
   knowledge_count: number;
   self_improving: boolean;
+  latest_quality_score: number | null;
+  quality_alert: boolean;
 }
 
 export interface SourceStats {
@@ -41,11 +70,15 @@ export interface AgentDetail {
   consolidation_model: string;
   soul: string;
   self_improving: boolean;
+  skill_eval: SkillEvalConfig;
   last_checked: Record<string, string>;
   last_consolidation: string | null;
   inbox_count: number;
   knowledge_count: number;
   source_stats: Record<string, SourceStats>;
+  latest_quality_score: number | null;
+  quality_alert: boolean;
+  has_soul_backup: boolean;
 }
 
 export interface AgentConfigCreate {
@@ -59,6 +92,7 @@ export interface AgentConfigCreate {
   consolidation_model: string;
   soul: string;
   self_improving: boolean;
+  skill_eval?: SkillEvalConfig;
 }
 
 export interface AgentConfigUpdate {
@@ -70,6 +104,7 @@ export interface AgentConfigUpdate {
   collection_model?: string;
   consolidation_model?: string;
   self_improving?: boolean;
+  skill_eval?: SkillEvalConfig;
 }
 
 export interface JobInfo {

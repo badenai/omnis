@@ -1,5 +1,4 @@
 agent_id: trading-price-action
-mode: accumulate
 model: gemini
 analysis_mode: full_video
 sources:

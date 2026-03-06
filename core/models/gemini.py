@@ -8,6 +8,7 @@ from tenacity import (
 from core.models.types import (
     AnalysisResult, ConsolidationResult, ConsolidationDecision,
     ResearchFinding, DiscoveredSource, ThesisValidationResult, CredibilitySignals,
+    SkillEvalResult, PromptEvalResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,7 @@ class GeminiProvider:
             pass
         return self._build_analysis_result(self._parse_result(response.text))
 
-    def generate_digest(self, knowledge_files: list[dict], soul: str, mode: str = "") -> str:
+    def generate_digest(self, knowledge_files: list[dict], soul: str) -> str:
         from datetime import date
         today = date.today().isoformat()
         files_text = "\n\n---\n\n".join(
@@ -450,8 +451,28 @@ class GeminiProvider:
             f"Based on what this agent has actually learned versus what the SOUL specifies, "
             f"suggest up to 5 concrete improvements to the SOUL.md. "
             f"Focus on: (1) underrepresented topics worth adding, (2) noise signals to narrow or remove, "
-            f"(3) new keywords or phrases that appear frequently but are not mentioned. "
-            f"Format as a numbered list with brief reasoning for each suggestion."
+            f"(3) new keywords or phrases that appear frequently but are not mentioned.\n\n"
+            f"Output ONLY the suggestion sections — no introduction, no conclusion, no preamble. "
+            f"Format each suggestion as a markdown section:\n\n"
+            f"## [Short title for the improvement]\n\n"
+            f"**Reasoning:** [1-2 sentences explaining why]\n\n"
+            f"**Change:** [Exact text to add or remove from the SOUL]\n\n"
+            f"Repeat for each suggestion."
+        )
+        return self._generate(contents, model=self._consolidation_model_name)
+
+    def integrate_soul_suggestions(self, soul: str, suggestions: list[str]) -> str:
+        suggestions_text = "\n\n---\n\n".join(suggestions)
+        contents = (
+            f"You are carefully revising an agent's SOUL.md by integrating specific improvements.\n\n"
+            f"Rules:\n"
+            f"- Preserve the existing soul's voice, structure, and core directives\n"
+            f"- Integrate each suggestion naturally into the appropriate existing section — do not append at the end\n"
+            f"- Only change what the suggestions specifically recommend; leave everything else intact\n"
+            f"- Do not add unnecessary new sections or restructure unnecessarily\n"
+            f"- Return ONLY the complete revised SOUL.md text, nothing else\n\n"
+            f"CURRENT SOUL:\n{soul}\n\n"
+            f"IMPROVEMENTS TO INTEGRATE:\n{suggestions_text}"
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
@@ -596,6 +617,84 @@ class GeminiProvider:
             flagged_files=flagged,
             validation_summary=summary,
             searched_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def evaluate_skill(
+        self, skill_content: str, test_prompts: list[str], soul: str
+    ) -> SkillEvalResult:
+        """Compare Gemini answers with vs. without the skill for each prompt, then grade the delta."""
+        import hashlib
+        from datetime import datetime, timezone
+
+        skill_truncated = skill_content[:8000]
+
+        # Collect bare answers (without skill context)
+        bare_answers = []
+        for prompt in test_prompts:
+            answer = self._generate(prompt, model=self._consolidation_model_name)
+            bare_answers.append(answer)
+
+        # Collect skill-assisted answers (skill prepended as context)
+        skill_answers = []
+        for prompt in test_prompts:
+            contents = (
+                f"CONTEXT (domain knowledge skill):\n{skill_truncated}\n\n"
+                f"Using the context above as additional domain knowledge, answer:\n{prompt}"
+            )
+            answer = self._generate(contents, model=self._consolidation_model_name)
+            skill_answers.append(answer)
+
+        # Single grader call: evaluate all prompt pairs
+        pairs_text = ""
+        for i, prompt in enumerate(test_prompts):
+            pairs_text += (
+                f"\n--- Prompt {i + 1} ---\n"
+                f"QUESTION: {prompt}\n\n"
+                f"ANSWER WITHOUT SKILL:\n{bare_answers[i][:1000]}\n\n"
+                f"ANSWER WITH SKILL:\n{skill_answers[i][:1000]}\n"
+            )
+
+        grader_prompt = (
+            f"AGENT SOUL (defines domain expectations):\n{soul}\n\n"
+            f"SKILL CONTENT (first 2000 chars):\n{skill_truncated[:2000]}\n\n"
+            f"TASK: For each prompt pair below, evaluate whether the skill provided meaningful "
+            f"domain-specific depth or constraints BEYOND what the model could produce from "
+            f"training alone. Score strictly:\n"
+            f"- with_skill_score: 0.0-1.0 (quality of skill-assisted answer)\n"
+            f"- without_skill_score: 0.0-1.0 (quality of bare answer)\n"
+            f"- Penalize inflated scores — require cited evidence from the skill content.\n"
+            f"- grader_reasoning: one sentence citing specific evidence from skill content\n\n"
+            f"Respond with valid JSON only, no markdown fences:\n"
+            f'{{"evaluations": [{{"prompt": "<prompt>", "with_skill_score": 0.0, '
+            f'"without_skill_score": 0.0, "grader_reasoning": "<reasoning>"}}]}}\n\n'
+            f"PROMPT PAIRS:{pairs_text}"
+        )
+        raw = self._generate(grader_prompt, model=self._consolidation_model_name)
+        data = self._parse_result(raw)
+
+        eval_results: list[PromptEvalResult] = []
+        for item in data.get("evaluations", []):
+            with_score = float(item.get("with_skill_score", 0.0))
+            without_score = float(item.get("without_skill_score", 0.0))
+            eval_results.append(PromptEvalResult(
+                prompt=item.get("prompt", ""),
+                with_skill_score=with_score,
+                without_skill_score=without_score,
+                delta=with_score - without_score,
+                grader_reasoning=item.get("grader_reasoning", ""),
+            ))
+
+        overall_score = (
+            sum(r.with_skill_score for r in eval_results) / len(eval_results)
+            if eval_results else 0.0
+        )
+        skill_version = hashlib.md5(skill_content.encode()).hexdigest()[:8]
+
+        return SkillEvalResult(
+            score=overall_score,
+            eval_results=eval_results,
+            skill_version=skill_version,
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
     def stream_query(self, system_prompt: str, message: str, history: list[dict]):

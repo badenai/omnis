@@ -8,7 +8,6 @@ def test_load_agent_from_directory(tmp_path):
     (agent_dir / "SOUL.md").write_text("# Soul\n## Mission\nTrade well.")
     config_yaml = """
 agent_id: trading-price-action
-mode: accumulate
 model: gemini
 analysis_mode: full_video
 sources:

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useKnowledge, useKnowledgeFile, useSkill, useDigest, useKnowledgeSearch } from '../api/knowledge';
+import { useKnowledge, useKnowledgeFile, useSkill, useDigest, useKnowledgeSearch, useSkillQuality } from '../api/knowledge';
 
 interface Props {
   agentId: string;
@@ -23,6 +23,7 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const { data: skill } = useSkill(agentId);
   const { data: digest } = useDigest(agentId);
   const { data: searchResults } = useKnowledgeSearch(agentId, searchQuery);
+  const { data: qualityData } = useSkillQuality(agentId);
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)', fontSize: 13 }}>
@@ -99,7 +100,30 @@ export default function KnowledgeBrowser({ agentId }: Props) {
         {/* Pinned: SKILL.md + digest.md */}
         <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: 3 }}>
           <button style={specialBtnStyle(specialView === 'skill')} onClick={() => { setSpecialView('skill'); setSelectedPath(null); }}>
-            ◆ SKILL.md
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>◆ SKILL.md</span>
+              {qualityData?.latest_score != null && (
+                <span style={{
+                  fontSize: 9,
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                  fontFamily: 'var(--font-mono)',
+                  backgroundColor: qualityData.alert
+                    ? 'rgba(239,68,68,0.15)'
+                    : qualityData.latest_score >= 0.75
+                      ? 'rgba(34,197,94,0.15)'
+                      : 'rgba(234,179,8,0.15)',
+                  color: qualityData.alert
+                    ? 'var(--color-status-error)'
+                    : qualityData.latest_score >= 0.75
+                      ? 'var(--color-status-ok)'
+                      : 'var(--color-status-warn)',
+                  border: `1px solid ${qualityData.alert ? 'rgba(239,68,68,0.3)' : qualityData.latest_score >= 0.75 ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)'}`,
+                }}>
+                  {qualityData.alert ? '⚠ ' : ''}{qualityData.latest_score.toFixed(2)}
+                </span>
+              )}
+            </span>
           </button>
           <button style={specialBtnStyle(specialView === 'digest')} onClick={() => { setSpecialView('digest'); setSelectedPath(null); }}>
             ◆ digest.md
@@ -193,13 +217,75 @@ export default function KnowledgeBrowser({ agentId }: Props) {
 
         {/* Special file header */}
         {specialView && (
-          <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, backgroundColor: 'var(--color-surface-1)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
-              {specialView === 'skill' ? 'SKILL.md' : 'digest.md'}
+          <div style={{ borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, backgroundColor: 'var(--color-surface-1)' }}>
+            <div style={{ padding: '10px 20px' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
+                {specialView === 'skill' ? 'SKILL.md' : 'digest.md'}
+              </div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                {specialView === 'skill' ? 'Generated skill file for Claude Code injection' : 'Latest consolidation digest'}
+              </div>
             </div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', marginTop: 2 }}>
-              {specialView === 'skill' ? 'Generated skill file for Claude Code injection' : 'Latest consolidation digest'}
-            </div>
+            {/* Quality panel — SKILL.md only */}
+            {specialView === 'skill' && qualityData && (
+              <div style={{ padding: '10px 20px', borderTop: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-surface-0)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: qualityData.history.length > 0 ? 10 : 0 }}>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Quality
+                  </span>
+                  {qualityData.latest_score != null ? (
+                    <>
+                      <span style={{
+                        fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600,
+                        color: qualityData.alert
+                          ? 'var(--color-status-error)'
+                          : qualityData.latest_score >= 0.75
+                            ? 'var(--color-status-ok)'
+                            : 'var(--color-status-warn)',
+                      }}>
+                        {qualityData.latest_score.toFixed(3)}
+                      </span>
+                      {qualityData.alert && (
+                        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-status-error)', backgroundColor: 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)' }}>
+                          ⚠ ALERT
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>no data</span>
+                  )}
+                  {/* Sparkline — last 12 runs */}
+                  {qualityData.history.length > 1 && (() => {
+                    const pts = qualityData.history.slice(0, 12).reverse();
+                    const W = 80, H = 20, n = pts.length;
+                    const xs = pts.map((_, i) => (i / (n - 1)) * W);
+                    const ys = pts.map(p => H - p.score * H);
+                    const d = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+                    const color = qualityData.alert ? '#ef4444' : qualityData.latest_score! >= 0.75 ? '#22c55e' : '#eab308';
+                    return (
+                      <svg width={W} height={H} style={{ overflow: 'visible', marginLeft: 4 }}>
+                        <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+                      </svg>
+                    );
+                  })()}
+                </div>
+                {/* Per-prompt delta breakdown */}
+                {qualityData.history[0]?.eval_results?.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {qualityData.history[0].eval_results.map((r, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: r.delta >= 0 ? 'var(--color-status-ok)' : 'var(--color-status-error)', flexShrink: 0, marginTop: 2 }}>
+                          {r.delta >= 0 ? '+' : ''}{r.delta.toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={r.prompt}>
+                          {r.prompt}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

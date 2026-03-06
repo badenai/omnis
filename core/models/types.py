@@ -63,6 +63,30 @@ class ThesisValidationResult:
 
 
 @dataclass
+class SkillEvalConfig:
+    prompts: list[str] = field(default_factory=list)
+    min_quality_threshold: float = 0.6
+    enabled: bool = True
+
+
+@dataclass
+class PromptEvalResult:
+    prompt: str
+    with_skill_score: float
+    without_skill_score: float
+    delta: float
+    grader_reasoning: str
+
+
+@dataclass
+class SkillEvalResult:
+    score: float
+    eval_results: list[PromptEvalResult]
+    skill_version: str   # md5 hash of skill content (8 chars)
+    timestamp: str       # ISO UTC
+
+
+@dataclass
 class AgentConfig:
     agent_id: str
     model: str                     # "gemini" | "openai" | "claude"
@@ -73,3 +97,4 @@ class AgentConfig:
     collection_model: str = "gemini-3-flash-preview"
     consolidation_model: str = "gemini-3.1-pro-preview"
     self_improving: bool = True
+    skill_eval: SkillEvalConfig = field(default_factory=SkillEvalConfig)

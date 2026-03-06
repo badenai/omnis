@@ -92,12 +92,11 @@ def test_write_skill_creates_installed_plugins_if_missing(tmp_path):
 
 def test_registry_register_and_save(tmp_path):
     reg = Registry(tmp_path / "registry.json")
-    reg.register("trading", tmp_path / "agents" / "trading" / "SKILL.md", "accumulate")
+    reg.register("trading", tmp_path / "agents" / "trading" / "SKILL.md")
     reg.save()
 
     reg2 = Registry(tmp_path / "registry.json")
     assert "trading" in reg2.agents
-    assert reg2.agents["trading"]["mode"] == "accumulate"
 
 
 def test_registry_load_missing_returns_empty(tmp_path):

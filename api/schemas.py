@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 
 
+class SkillEvalConfig(BaseModel):
+    prompts: list[str] = []
+    min_quality_threshold: float = 0.6
+    enabled: bool = True
+
+
 class ChannelSource(BaseModel):
     handle: str
 
@@ -24,6 +30,7 @@ class AgentConfigCreate(BaseModel):
     consolidation_model: str = "gemini-3.1-pro-preview"
     soul: str = ""
     self_improving: bool = True
+    skill_eval: SkillEvalConfig = SkillEvalConfig()
 
 
 class AgentConfigUpdate(BaseModel):
@@ -35,6 +42,7 @@ class AgentConfigUpdate(BaseModel):
     collection_model: str | None = None
     consolidation_model: str | None = None
     self_improving: bool | None = None
+    skill_eval: SkillEvalConfig | None = None
 
 
 class SoulUpdate(BaseModel):
@@ -51,6 +59,8 @@ class AgentSummary(BaseModel):
     inbox_count: int = 0
     knowledge_count: int = 0
     self_improving: bool = True
+    latest_quality_score: float | None = None
+    quality_alert: bool = False
 
 
 class SourceStats(BaseModel):
@@ -72,11 +82,20 @@ class AgentDetail(BaseModel):
     consolidation_model: str
     soul: str
     self_improving: bool = True
+    skill_eval: SkillEvalConfig = SkillEvalConfig()
     last_checked: dict = {}
     last_consolidation: str | None = None
     inbox_count: int = 0
     knowledge_count: int = 0
     source_stats: dict[str, SourceStats] = {}
+    latest_quality_score: float | None = None
+    quality_alert: bool = False
+    has_soul_backup: bool = False
+
+
+class SoulIntegrateRequest(BaseModel):
+    soul: str
+    suggestions: list[str]
 
 
 class IngestUrlRequest(BaseModel):

@@ -26,7 +26,6 @@ def test_load_soul_missing_returns_empty(tmp_path):
 def test_load_config_reads_self_improving(tmp_path):
     yaml_content = """\
 agent_id: test-agent
-mode: accumulate
 model: gemini
 analysis_mode: transcript_only
 sources: {}
@@ -43,7 +42,6 @@ self_improving: false
 def test_load_config_defaults_self_improving_to_true(tmp_path):
     yaml_content = """\
 agent_id: test-agent
-mode: accumulate
 model: gemini
 analysis_mode: transcript_only
 sources: {}

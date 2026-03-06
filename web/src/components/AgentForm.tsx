@@ -4,6 +4,7 @@ import { useCreateAgent, useUpdateConfig } from '../api/agents';
 import type { AgentDetail, ChannelSource } from '../types';
 import ChannelList from './ChannelList';
 import Tooltip from './Tooltip';
+import SoulAssistantPanel from './SoulAssistantPanel';
 
 function cronToTime(cron: string): string {
   const parts = cron.trim().split(/\s+/);
@@ -111,7 +112,14 @@ export default function AgentForm({ agent }: Props) {
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
   const [selfImproving, setSelfImproving] = useState(agent?.self_improving ?? true);
+  const [skillEvalPrompts, setSkillEvalPrompts] = useState(
+    agent?.skill_eval?.prompts?.join('\n') ?? ''
+  );
+  const [skillEvalThreshold, setSkillEvalThreshold] = useState(
+    agent?.skill_eval?.min_quality_threshold ?? 0.6
+  );
   const [soul, setSoul] = useState('');
+  const [showSoulAssistant, setShowSoulAssistant] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -121,6 +129,11 @@ export default function AgentForm({ agent }: Props) {
     setMessage('');
 
     try {
+      const skillEval = {
+        prompts: skillEvalPrompts.split('\n').map(s => s.trim()).filter(Boolean),
+        min_quality_threshold: skillEvalThreshold,
+        enabled: true,
+      };
       if (isEdit) {
         await updateConfig.mutateAsync({
           model,
@@ -130,6 +143,7 @@ export default function AgentForm({ agent }: Props) {
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
           self_improving: selfImproving,
+          skill_eval: skillEval,
         });
         setMessage('Config saved.');
       } else {
@@ -144,6 +158,7 @@ export default function AgentForm({ agent }: Props) {
           consolidation_model: consolidationModel,
           soul,
           self_improving: selfImproving,
+          skill_eval: skillEval,
         });
         navigate(`/agents/${agentId}`);
       }
@@ -244,15 +259,82 @@ export default function AgentForm({ agent }: Props) {
         </label>
       </Field>
 
+      <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 16 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 12 }}>
+          Skill Quality Evaluation
+        </div>
+        <div className="space-y-4">
+          <Field label="Test Prompts (one per line)" tooltip="Prompts used to evaluate SKILL.md quality after each consolidation. The agent answers each prompt with and without the skill, then grades the difference. Leave empty to skip evaluation.">
+            <StyledTextarea
+              value={skillEvalPrompts}
+              onChange={(e) => setSkillEvalPrompts(e.target.value)}
+              rows={4}
+              placeholder={"What are the best practices for X?\nSummarize the current state of Y"}
+            />
+          </Field>
+          <Field label={`Min Quality Threshold: ${skillEvalThreshold.toFixed(2)}`} tooltip="Alert when the latest SKILL.md quality score drops below this value, or drops more than 20% relative to the previous run. Range 0.0–1.0.">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={skillEvalThreshold}
+              onChange={(e) => setSkillEvalThreshold(Number(e.target.value))}
+              className="w-full"
+            />
+          </Field>
+        </div>
+      </div>
+
       {!isEdit && (
-        <Field label="Soul (SOUL.md)" tooltip="The agent's personality and mission. Tells the AI what to pay attention to and what to ignore. This is the most important setting — it directly controls what gets collected and learned.">
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <label style={labelStyle}>
+              Soul (SOUL.md)
+              <Tooltip text="The agent's personality and mission. Tells the AI what to pay attention to and what to ignore. This is the most important setting — it directly controls what gets collected and learned." />
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowSoulAssistant(s => !s)}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: 8,
+                border: '1px solid var(--color-border-default)',
+                cursor: 'pointer',
+                backgroundColor: showSoulAssistant ? 'var(--color-accent-glow)' : 'transparent',
+                color: showSoulAssistant ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                borderColor: showSoulAssistant ? 'var(--color-accent-dim)' : 'var(--color-border-default)',
+                transition: 'all 150ms',
+              }}
+            >
+              ✦ AI Assist
+            </button>
+          </div>
           <StyledTextarea
             value={soul}
             onChange={(e) => setSoul(e.target.value)}
             rows={8}
             placeholder="Agent personality and instructions..."
           />
-        </Field>
+          {showSoulAssistant && (
+            <div style={{
+              marginTop: 10,
+              maxHeight: 500,
+              border: '1px solid var(--color-border-subtle)',
+              borderRadius: 8,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <SoulAssistantPanel
+                currentSoul={soul}
+                onApply={(s) => setSoul(s)}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-3 pt-1">

@@ -108,6 +108,20 @@ def read_digest_diff(agent_id: str, request: Request):
     return _read_diff(agent["dir"], "digest.md", "digest.previous.md")
 
 
+@router.get("/{agent_id}/quality")
+def read_skill_quality(agent_id: str, request: Request):
+    agent = _get_agent(agent_id, request)
+    from core.skill_quality import SkillQualityStore
+    config = agent["config"]
+    store = SkillQualityStore(agent["dir"])
+    threshold = config.skill_eval.min_quality_threshold
+    return {
+        "history": store.history(),
+        "latest_score": store.latest_score(),
+        "alert": store.is_alert(threshold),
+    }
+
+
 @router.get("/{agent_id}/search")
 def search_knowledge(agent_id: str, q: str = Query(..., min_length=1), request: Request = None):
     agent = _get_agent(agent_id, request)

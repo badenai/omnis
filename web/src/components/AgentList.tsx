@@ -2,16 +2,18 @@ import { Link } from 'react-router-dom';
 import { useAgents } from '../api/agents';
 import { useActivity } from '../api/scheduler';
 
-type AgentStatus = 'running' | 'attention' | 'ok' | 'idle';
+type AgentStatus = 'running' | 'attention' | 'quality-alert' | 'ok' | 'idle';
 
 function agentStatus(
   agentId: string,
   inboxCount: number,
   lastConsolidation: string | null | undefined,
-  activeAgentIds: Set<string>
+  activeAgentIds: Set<string>,
+  qualityAlert: boolean,
 ): AgentStatus {
   if (activeAgentIds.has(agentId)) return 'running';
   if (inboxCount > 0) return 'attention';
+  if (qualityAlert) return 'quality-alert';
   if (!lastConsolidation) return 'idle';
   return 'ok';
 }
@@ -19,6 +21,7 @@ function agentStatus(
 const statusConfig: Record<AgentStatus, { color: string; label: string }> = {
   running: { color: 'var(--color-status-active)', label: 'Running' },
   attention: { color: 'var(--color-status-warn)', label: 'Attention' },
+  'quality-alert': { color: 'var(--color-status-error)', label: 'Quality Alert' },
   ok: { color: 'var(--color-status-ok)', label: 'OK' },
   idle: { color: 'var(--color-status-idle)', label: 'Idle' },
 };
@@ -77,6 +80,7 @@ export default function AgentList() {
   const agentList = agents ?? [];
   const totalKnowledge = agentList.reduce((sum, a) => sum + a.knowledge_count, 0);
   const needsAttention = agentList.filter((a) => a.inbox_count > 0).length;
+  const qualityAlerts = agentList.filter((a) => a.quality_alert).length;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 32 }}>
@@ -111,7 +115,7 @@ export default function AgentList() {
           <StatCard label="Total Agents" value={agentList.length} />
           <StatCard label="Active Tasks" value={activeAgentIds.size} accent={activeAgentIds.size > 0 ? 'var(--color-status-active)' : undefined} />
           <StatCard label="Needs Attention" value={needsAttention} accent={needsAttention > 0 ? 'var(--color-status-warn)' : undefined} />
-          <StatCard label="Knowledge Files" value={totalKnowledge} />
+          <StatCard label="Quality Alerts" value={qualityAlerts} accent={qualityAlerts > 0 ? 'var(--color-status-error)' : undefined} />
         </div>
       )}
 
@@ -158,7 +162,7 @@ export default function AgentList() {
         /* Agent grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agentList.map((a) => {
-            const status = agentStatus(a.agent_id, a.inbox_count, a.last_consolidation, activeAgentIds);
+            const status = agentStatus(a.agent_id, a.inbox_count, a.last_consolidation, activeAgentIds, a.quality_alert);
             const sc = statusConfig[status];
             return (
               <Link
@@ -214,13 +218,18 @@ export default function AgentList() {
 
                 {/* Metrics strip */}
                 <div
-                  className="grid grid-cols-3 divide-x"
+                  className="grid grid-cols-4 divide-x"
                   style={{ backgroundColor: 'var(--color-surface-2)', borderTop: '1px solid var(--color-border-subtle)', borderColor: 'var(--color-border-subtle)' }}
                 >
                   {[
                     { label: 'Inbox', value: a.inbox_count, warn: a.inbox_count > 0 },
                     { label: 'Knowledge', value: a.knowledge_count, warn: false },
                     { label: 'Channels', value: a.channel_count, warn: false },
+                    {
+                      label: 'Quality',
+                      value: a.latest_quality_score != null ? a.latest_quality_score.toFixed(2) : '—',
+                      warn: a.quality_alert,
+                    },
                   ].map(({ label, value, warn }) => (
                     <div
                       key={label}

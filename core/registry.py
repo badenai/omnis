@@ -17,11 +17,10 @@ class Registry:
     def agents(self) -> dict:
         return self._data["agents"]
 
-    def register(self, agent_id: str, skill_path: pathlib.Path, mode: str) -> None:
+    def register(self, agent_id: str, skill_path: pathlib.Path) -> None:
         self._data["agents"][agent_id] = {
             "skill_path": str(skill_path),
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            "mode": mode,
         }
 
     def save(self) -> None:

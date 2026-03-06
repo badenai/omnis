@@ -2,6 +2,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { AgentSummary, AgentDetail, AgentConfigCreate, AgentConfigUpdate } from '../types';
 
+export function useIntegrateSoul(id: string) {
+  return useMutation({
+    mutationFn: ({ soul, suggestions }: { soul: string; suggestions: string[] }) =>
+      apiFetch<{ integrated_soul: string }>(`/agents/${id}/soul/integrate`, {
+        method: 'POST',
+        body: JSON.stringify({ soul, suggestions }),
+      }),
+  });
+}
+
+export function useRevertSoul(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<AgentDetail>(`/agents/${id}/soul/revert`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['agents', id] }),
+  });
+}
+
 export function useAgents() {
   return useQuery({
     queryKey: ['agents'],

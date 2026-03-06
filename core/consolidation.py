@@ -6,6 +6,7 @@ from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
 from core.registry import Registry
 from core.skill_writer import SkillWriter
+from core.skill_quality import SkillQualityStore
 from core.state import AgentState
 from core.models.types import AgentConfig
 from core import job_status
@@ -87,13 +88,10 @@ class ConsolidationPipeline:
             sw = SkillWriter(self._dir)
             skill_changed = sw.write(skill_content, self._config.agent_id)
             job_status.log(agent_id, task, "SKILL.md written")
+            self._run_skill_eval_safely(skill_content)
 
             reg = Registry(DATA_DIR / "registry.json")
-            reg.register(
-                self._config.agent_id,
-                self._dir / "SKILL.md",
-                "",
-            )
+            reg.register(self._config.agent_id, self._dir / "SKILL.md")
             reg.save()
 
             self._update_index(knowledge_files)
@@ -172,9 +170,10 @@ class ConsolidationPipeline:
             skill_content = self._provider.generate_skill(digest, self._soul, self._config.agent_id)
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
+            self._run_skill_eval_safely(skill_content)
 
             reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md", "")
+            reg.register(self._config.agent_id, self._dir / "SKILL.md")
             reg.save()
 
             self._update_index(knowledge_files)
@@ -234,6 +233,27 @@ class ConsolidationPipeline:
                 sev = flag.get("severity", "low").upper()
                 lines.append(f"- [{sev}] `{flag['path']}` — {flag['concern']}")
         return "\n".join(lines)
+
+    def _run_skill_eval_safely(self, skill_content: str) -> None:
+        """Run SKILL.md quality evaluation; swallow errors so consolidation succeeds."""
+        agent_id = self._config.agent_id
+        task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
+        eval_cfg = self._config.skill_eval
+        if not (eval_cfg.enabled and eval_cfg.prompts):
+            return
+        try:
+            job_status.update_step(agent_id, task, "Evaluating SKILL.md quality...")
+            result = self._provider.evaluate_skill(skill_content, eval_cfg.prompts, self._soul)
+            store = SkillQualityStore(self._dir)
+            store.append(result)
+            alert = store.is_alert(eval_cfg.min_quality_threshold)
+            job_status.log(
+                agent_id, task,
+                f"skill quality score: {result.score:.3f}"
+                + (" ⚠ ALERT" if alert else "")
+            )
+        except Exception as e:
+            logger.warning(f"[{agent_id}] Skill quality check failed (non-fatal): {e}")
 
     def _call_thesis_validation_safely(self) -> None:
         """Run thesis validation; swallow errors so consolidation succeeds."""
