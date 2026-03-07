@@ -48,6 +48,7 @@ class CollectionPipeline:
                 vid_url = video.get("webpage_url", f"https://www.youtube.com/watch?v={vid_id}")
 
                 job_status.update_step(agent_id, task, f"Analyzing video {i}/{total}: {vid_title[:60]}...")
+                job_status.log(agent_id, task, f"[{i}/{total}] Calling Gemini: {vid_title[:60]}…")
                 try:
                     if self._config.analysis_mode == "full_video" and self._config.model == "gemini":
                         result = self._provider.analyze_video(

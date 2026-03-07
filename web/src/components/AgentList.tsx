@@ -78,7 +78,6 @@ export default function AgentList() {
   );
 
   const agentList = agents ?? [];
-  const totalKnowledge = agentList.reduce((sum, a) => sum + a.knowledge_count, 0);
   const needsAttention = agentList.filter((a) => a.inbox_count > 0).length;
   const qualityAlerts = agentList.filter((a) => a.quality_alert).length;
 

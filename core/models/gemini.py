@@ -623,20 +623,30 @@ class GeminiProvider:
         self, skill_content: str, test_prompts: list[str], soul: str
     ) -> SkillEvalResult:
         """Compare Gemini answers with vs. without the skill for each prompt, then grade the delta."""
+        from core import job_status
         import hashlib
         from datetime import datetime, timezone
 
+        ctx = job_status.get_current()
         skill_truncated = skill_content[:8000]
 
         # Collect bare answers (without skill context)
+        if ctx:
+            job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} baseline queries…")
         bare_answers = []
-        for prompt in test_prompts:
+        for i, prompt in enumerate(test_prompts):
+            if ctx:
+                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] baseline query…")
             answer = self._generate(prompt, model=self._consolidation_model_name)
             bare_answers.append(answer)
 
         # Collect skill-assisted answers (skill prepended as context)
+        if ctx:
+            job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} skill-assisted queries…")
         skill_answers = []
-        for prompt in test_prompts:
+        for i, prompt in enumerate(test_prompts):
+            if ctx:
+                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] skill-assisted query…")
             contents = (
                 f"CONTEXT (domain knowledge skill):\n{skill_truncated}\n\n"
                 f"Using the context above as additional domain knowledge, answer:\n{prompt}"
@@ -645,6 +655,8 @@ class GeminiProvider:
             skill_answers.append(answer)
 
         # Single grader call: evaluate all prompt pairs
+        if ctx:
+            job_status.update_step(ctx[0], ctx[1], "Skill eval: grading quality delta…")
         pairs_text = ""
         for i, prompt in enumerate(test_prompts):
             pairs_text += (

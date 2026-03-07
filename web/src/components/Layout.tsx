@@ -29,17 +29,6 @@ function TerminalIcon() {
   );
 }
 
-function ChevronUpIcon({ flipped }: { flipped?: boolean }) {
-  return (
-    <svg
-      width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-      strokeWidth={1.5} strokeLinecap="round"
-      style={{ transform: flipped ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}
-    >
-      <path d="M2 8l4-4 4 4" />
-    </svg>
-  );
-}
 
 export default function Layout() {
   const { active, history } = useActivityStream();

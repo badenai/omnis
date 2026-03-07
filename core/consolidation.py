@@ -40,6 +40,7 @@ class ConsolidationPipeline:
             existing_index = index_path.read_text(encoding="utf-8") if index_path.exists() else ""
 
             job_status.update_step(agent_id, task, f"Asking model to categorize {len(items)} inbox items...")
+            job_status.log(agent_id, task, f"Calling Gemini: categorizing {len(items)} inbox items…")
             result = self._provider.consolidate(items, existing_index, self._soul)
 
             job_status.update_step(agent_id, task, f"Writing {len(result.decisions)} knowledge files...")
@@ -105,8 +106,10 @@ class ConsolidationPipeline:
 
             job_status.update_step(agent_id, task, "Generating SOUL evolution suggestions...")
             try:
+                job_status.log(agent_id, task, "Calling Gemini: generating soul evolution suggestions…")
                 suggestions = self._provider.suggest_soul_refinements(self._soul, knowledge_files[:15])
                 (self._dir / "soul_suggestions.md").write_text(suggestions, encoding="utf-8")
+                job_status.log(agent_id, task, "soul_suggestions.md written")
             except Exception as e:
                 logger.warning(f"[{agent_id}] Soul suggestions failed (non-fatal): {e}")
 

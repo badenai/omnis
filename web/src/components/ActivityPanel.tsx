@@ -109,6 +109,16 @@ function ActiveJobCard({ job }: { job: JobActivity }) {
   const logRef = useRef<HTMLDivElement>(null);
   const [userScrolled, setUserScrolled] = useState(false);
 
+  const lastLogTs = job.logs.length > 0
+    ? new Date(job.logs[job.logs.length - 1].ts).getTime()
+    : new Date(job.started_at).getTime();
+  const [ageMs, setAgeMs] = useState(() => Date.now() - lastLogTs);
+  useEffect(() => {
+    const id = setInterval(() => setAgeMs(Date.now() - lastLogTs), 1000);
+    return () => clearInterval(id);
+  }, [lastLogTs]);
+  const isWaiting = ageMs > 8000;
+
   useEffect(() => {
     if (!logRef.current || userScrolled) return;
     logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -143,8 +153,11 @@ function ActiveJobCard({ job }: { job: JobActivity }) {
       </div>
 
       {/* Current step */}
-      <div className="px-2 py-1 text-[10px] truncate" style={{ color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)' }}>
-        {job.step}
+      <div className="px-2 py-1 text-[10px] flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)' }}>
+        <span className="truncate flex-1">{job.step}</span>
+        {isWaiting && (
+          <span className="animate-pulse shrink-0" style={{ color: 'var(--color-accent)', letterSpacing: 2 }}>···</span>
+        )}
       </div>
 
       {/* Log scroll area */}
