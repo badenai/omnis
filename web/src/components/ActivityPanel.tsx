@@ -165,7 +165,7 @@ function ActiveJobCard({ job }: { job: JobActivity }) {
         ref={logRef}
         onScroll={handleScroll}
         className="px-2 py-1.5 overflow-y-auto flex flex-col gap-0.5"
-        style={{ maxHeight: '280px' }}
+        style={{ maxHeight: '60vh' }}
       >
         {job.logs.length === 0 ? (
           <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Waiting for log output…</span>

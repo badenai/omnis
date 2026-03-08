@@ -1,5 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ActivityPanel from './ActivityPanel';
+
+const MIN_H = 140;
+const MAX_H = 700;
+const DEFAULT_H = 300;
+const STORAGE_KEY = 'activity-drawer-height';
 
 function TerminalIcon() {
   return (
@@ -27,6 +32,16 @@ interface Props {
 }
 
 export default function ActivityDrawer({ open, onClose, activeCount, historyCount }: Props) {
+  const [height, setHeight] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const n = saved ? parseInt(saved, 10) : DEFAULT_H;
+    return isNaN(n) ? DEFAULT_H : Math.min(MAX_H, Math.max(MIN_H, n));
+  });
+
+  const dragging = useRef(false);
+  const startY = useRef(0);
+  const startH = useRef(0);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -34,21 +49,70 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  function onHandleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    dragging.current = true;
+    startY.current = e.clientY;
+    startH.current = height;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const delta = startY.current - ev.clientY;
+      const next = Math.min(MAX_H, Math.max(MIN_H, startH.current + delta));
+      setHeight(next);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      // Persist
+      setHeight(h => {
+        localStorage.setItem(STORAGE_KEY, String(h));
+        return h;
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   const hasContent = activeCount > 0 || historyCount > 0;
 
   return (
     <div
       style={{
-        height: open ? 400 : 0,
+        height: open ? height : 0,
         overflow: 'hidden',
         flexShrink: 0,
-        transition: 'height 240ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: dragging.current ? 'none' : 'height 240ms cubic-bezier(0.4, 0, 0.2, 1)',
         borderTop: open ? '1px solid var(--color-border-default)' : 'none',
         backgroundColor: 'var(--color-surface-1)',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
+      {/* Drag handle */}
+      <div
+        onMouseDown={onHandleMouseDown}
+        style={{
+          height: 5,
+          flexShrink: 0,
+          cursor: 'ns-resize',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'transparent',
+          transition: 'background 120ms',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-3)')}
+        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+        title="Drag to resize"
+      >
+        <span style={{
+          display: 'block', width: 28, height: 2, borderRadius: 2,
+          backgroundColor: 'var(--color-border-default)', pointerEvents: 'none',
+        }} />
+      </div>
+
       {/* Header */}
       <div
         style={{
@@ -56,7 +120,7 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
           alignItems: 'center',
           gap: 10,
           padding: '0 20px',
-          height: 38,
+          height: 34,
           flexShrink: 0,
           borderBottom: '1px solid var(--color-border-subtle)',
         }}
@@ -101,7 +165,6 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Keyboard hint */}
           <span
             style={{
               fontSize: 10,
@@ -138,7 +201,7 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '14px 20px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px', minHeight: 0 }}>
         {!hasContent ? (
           <div
             style={{

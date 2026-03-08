@@ -100,6 +100,18 @@ export function useTriggerReevaluation(agentId: string) {
   });
 }
 
+export function useTriggerAuditSkill(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch(`/scheduler/trigger/${agentId}/audit-skill`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['jobs'] });
+      qc.invalidateQueries({ queryKey: ['knowledge'] });
+    },
+  });
+}
+
 export function useTriggerFactCheck(agentId: string) {
   const qc = useQueryClient();
   return useMutation({

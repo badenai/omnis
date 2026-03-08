@@ -624,84 +624,114 @@ class GeminiProvider:
     def evaluate_skill(
         self, skill_content: str, test_prompts: list[str], soul: str
     ) -> SkillEvalResult:
-        """Compare Gemini answers with vs. without the skill for each prompt, then grade the delta."""
-        from core import job_status
+        """Blind A/B comparison with SOUL-aware rubric.
+
+        For each prompt:
+          1. Get bare answer (no skill) and skill-assisted answer.
+          2. Randomly assign to Answer A / Answer B (blind labels).
+          3. Grade both using domain focus from SOUL as rubric.
+          4. Unblind: map a_score/b_score back to skill/bare.
+
+        Overall score = mean(skill_scores) normalised by mean(bare_scores),
+        capped at 1.0, so it represents relative improvement over baseline.
+        """
         import hashlib
+        import random
+        from core import job_status
         from datetime import datetime, timezone
 
         ctx = job_status.get_current()
         skill_truncated = skill_content[:8000]
+        soul_focus = soul[:500]  # first 500 chars captures focus areas without overwhelming
 
-        # Collect bare answers (without skill context)
+        # --- Step 1: Bare answers ---
         if ctx:
             job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} baseline queries…")
         bare_answers = []
         for i, prompt in enumerate(test_prompts):
             if ctx:
-                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] baseline query…")
-            answer = self._generate(prompt, model=self._consolidation_model_name)
-            bare_answers.append(answer)
+                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] baseline…")
+            bare_answers.append(self._generate(prompt, model=self._consolidation_model_name))
 
-        # Collect skill-assisted answers (skill prepended as context)
+        # --- Step 2: Skill-assisted answers ---
         if ctx:
             job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} skill-assisted queries…")
         skill_answers = []
         for i, prompt in enumerate(test_prompts):
             if ctx:
-                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] skill-assisted query…")
+                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] skill-assisted…")
             contents = (
                 f"CONTEXT (domain knowledge skill):\n{skill_truncated}\n\n"
                 f"Using the context above as additional domain knowledge, answer:\n{prompt}"
             )
-            answer = self._generate(contents, model=self._consolidation_model_name)
-            skill_answers.append(answer)
+            skill_answers.append(self._generate(contents, model=self._consolidation_model_name))
 
-        # Single grader call: evaluate all prompt pairs
-        if ctx:
-            job_status.update_step(ctx[0], ctx[1], "Skill eval: grading quality delta…")
+        # --- Step 3: Blind A/B assignment ---
+        # For each prompt, randomly decide whether bare=A/skill=B or skill=A/bare=B.
+        # skill_is_a[i] = True means Answer A is the skill answer for prompt i.
+        skill_is_a = [random.random() < 0.5 for _ in test_prompts]
+
         pairs_text = ""
         for i, prompt in enumerate(test_prompts):
+            if skill_is_a[i]:
+                answer_a, answer_b = skill_answers[i], bare_answers[i]
+            else:
+                answer_a, answer_b = bare_answers[i], skill_answers[i]
             pairs_text += (
                 f"\n--- Prompt {i + 1} ---\n"
-                f"QUESTION: {prompt}\n\n"
-                f"ANSWER WITHOUT SKILL:\n{bare_answers[i][:1000]}\n\n"
-                f"ANSWER WITH SKILL:\n{skill_answers[i][:1000]}\n"
+                f"Question: {prompt}\n\n"
+                f"Answer A:\n{answer_a[:1000]}\n\n"
+                f"Answer B:\n{answer_b[:1000]}\n"
             )
 
+        # --- Step 4: Blind grading ---
+        if ctx:
+            job_status.update_step(ctx[0], ctx[1], "Skill eval: blind A/B grading…")
+
         grader_prompt = (
-            f"AGENT SOUL (defines domain expectations):\n{soul}\n\n"
-            f"SKILL CONTENT (first 2000 chars):\n{skill_truncated[:2000]}\n\n"
-            f"TASK: For each prompt pair below, evaluate whether the skill provided meaningful "
-            f"domain-specific depth or constraints BEYOND what the model could produce from "
-            f"training alone. Score strictly:\n"
-            f"- with_skill_score: 0.0-1.0 (quality of skill-assisted answer)\n"
-            f"- without_skill_score: 0.0-1.0 (quality of bare answer)\n"
-            f"- Penalize inflated scores — require cited evidence from the skill content.\n"
-            f"- grader_reasoning: one sentence citing specific evidence from skill content\n\n"
+            f"DOMAIN FOCUS (from agent soul):\n{soul_focus}\n\n"
+            f"TASK: For each question below, score Answer A and Answer B independently "
+            f"on a 0–1 scale based on domain-specific relevance and depth as defined by the "
+            f"domain focus above. Do NOT consider which answer is 'longer' — judge quality.\n"
+            f"Penalise vague or generic answers; reward answers that cite domain-specific detail.\n\n"
             f"Respond with valid JSON only, no markdown fences:\n"
-            f'{{"evaluations": [{{"prompt": "<prompt>", "with_skill_score": 0.0, '
-            f'"without_skill_score": 0.0, "grader_reasoning": "<reasoning>"}}]}}\n\n'
+            f'{{"evaluations": [{{"prompt": "<prompt>", "a_score": 0.0, "b_score": 0.0, '
+            f'"winner": "A"|"B"|"tie", "reasoning": "<one sentence referencing domain focus>"}}]}}\n\n'
             f"PROMPT PAIRS:{pairs_text}"
         )
         raw = self._generate(grader_prompt, model=self._consolidation_model_name)
         data = self._parse_result(raw)
 
+        # --- Step 5: Unblind and build results ---
         eval_results: list[PromptEvalResult] = []
-        for item in data.get("evaluations", []):
-            with_score = float(item.get("with_skill_score", 0.0))
-            without_score = float(item.get("without_skill_score", 0.0))
+        graded = data.get("evaluations", [])
+
+        for i, item in enumerate(graded):
+            a_score = float(item.get("a_score", 0.0))
+            b_score = float(item.get("b_score", 0.0))
+
+            # Unblind: determine which score belongs to skill vs bare
+            if i < len(skill_is_a) and skill_is_a[i]:
+                skill_score, bare_score = a_score, b_score
+            else:
+                skill_score, bare_score = b_score, a_score
+
             eval_results.append(PromptEvalResult(
-                prompt=item.get("prompt", ""),
-                with_skill_score=with_score,
-                without_skill_score=without_score,
-                delta=with_score - without_score,
-                grader_reasoning=item.get("grader_reasoning", ""),
+                prompt=item.get("prompt", test_prompts[i] if i < len(test_prompts) else ""),
+                with_skill_score=skill_score,
+                without_skill_score=bare_score,
+                delta=skill_score - bare_score,
+                grader_reasoning=item.get("reasoning", ""),
             ))
 
-        overall_score = (
-            sum(r.with_skill_score for r in eval_results) / len(eval_results)
-            if eval_results else 0.0
-        )
+        # --- Step 6: Normalised overall score ---
+        if eval_results:
+            mean_skill = sum(r.with_skill_score for r in eval_results) / len(eval_results)
+            mean_bare = sum(r.without_skill_score for r in eval_results) / len(eval_results)
+            overall_score = min(1.0, mean_skill / max(mean_bare, 0.0001)) if mean_bare > 0 else mean_skill
+        else:
+            overall_score = 0.0
+
         skill_version = hashlib.md5(skill_content.encode()).hexdigest()[:8]
 
         return SkillEvalResult(

@@ -29,6 +29,22 @@ export interface QualityHistory {
   alert: boolean;
 }
 
+export interface StructureIssue {
+  severity: 'warning' | 'error';
+  criterion: string;
+  section?: string;
+  issue: string;
+  suggestion: string;
+}
+
+export interface SkillAudit {
+  timestamp: string;
+  line_count: number;
+  overall_score: number;
+  issues: StructureIssue[];
+  summary: string;
+}
+
 export interface AgentSources {
   youtube_channels: ChannelSource[];
 }

@@ -122,6 +122,16 @@ def read_skill_quality(agent_id: str, request: Request):
     }
 
 
+@router.get("/{agent_id}/audit")
+def read_skill_audit(agent_id: str, request: Request):
+    agent = _get_agent(agent_id, request)
+    audit_path = agent["dir"] / "skill_audit.json"
+    if not audit_path.exists():
+        raise HTTPException(404, "No audit data — run 'Audit Skill' first")
+    import json
+    return json.loads(audit_path.read_text(encoding="utf-8"))
+
+
 @router.get("/{agent_id}/search")
 def search_knowledge(agent_id: str, q: str = Query(..., min_length=1), request: Request = None):
     agent = _get_agent(agent_id, request)

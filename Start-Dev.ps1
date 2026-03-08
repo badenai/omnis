@@ -103,9 +103,9 @@ Write-Host ""
 # ---------------------------------------------------------------------------
 # Open browser after a short delay
 # ---------------------------------------------------------------------------
-if (-not $NoBrowser -and -not $NoFrontend) {
-    Start-Job -ScriptBlock { Start-Sleep 3; Start-Process "http://localhost:5173" } | Out-Null
-}
+# if (-not $NoBrowser -and -not $NoFrontend) {
+#     Start-Job -ScriptBlock { Start-Sleep 3; Start-Process "http://localhost:5173" } | Out-Null
+# }
 
 # ---------------------------------------------------------------------------
 # Wait -- Ctrl+C triggers the finally block
