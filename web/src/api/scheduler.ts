@@ -66,7 +66,18 @@ export function useTriggerCollection(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (handle: string) =>
-      apiFetch(`/scheduler/trigger/${agentId}/collect/${encodeURIComponent(handle)}`, { method: 'POST' }),
+      apiFetch(`/scheduler/trigger/${agentId}/collect/${encodeURIComponent(handle)}?consolidate=false`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
+  });
+}
+
+export function useTriggerScan(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ handle, limit }: { handle: string; limit: number | null }) => {
+      const params = limit !== null ? `?limit=${limit}` : '';
+      return apiFetch(`/scheduler/trigger/${agentId}/scan/${encodeURIComponent(handle)}${params}`, { method: 'POST' });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
 }

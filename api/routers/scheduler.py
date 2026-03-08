@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from core.scheduler_instance import get_scheduler
@@ -47,7 +47,7 @@ def trigger_run(agent_id: str, request: Request):
 
 
 @router.post("/trigger/{agent_id}/collect/{handle}")
-def trigger_collection(agent_id: str, handle: str, request: Request):
+def trigger_collection(agent_id: str, handle: str, request: Request, consolidate: bool = Query(True)):
     agents = request.app.state.agents
     if agent_id not in agents:
         raise HTTPException(404, f"Agent '{agent_id}' not found")
@@ -59,7 +59,8 @@ def trigger_collection(agent_id: str, handle: str, request: Request):
 
     def _collect_and_consolidate(handle: str):
         collection_pipeline.run_collection(handle)
-        consolidation_pipeline.run()
+        if consolidate:
+            consolidation_pipeline.run()
 
     scheduler.add_job(
         _collect_and_consolidate,
@@ -69,7 +70,33 @@ def trigger_collection(agent_id: str, handle: str, request: Request):
         id=f"{agent_id}_{handle}_manual_{datetime.now(timezone.utc).timestamp():.0f}",
         name=f"Manual collect {handle} for {agent_id}",
     )
-    logger.info(f"Triggered collection + consolidation: {agent_id} / {handle}")
+    logger.info(f"Triggered collection (consolidate={consolidate}): {agent_id} / {handle}")
+    return {"status": "triggered", "agent_id": agent_id, "handle": handle}
+
+
+@router.post("/trigger/{agent_id}/scan/{handle}")
+def trigger_scan(agent_id: str, handle: str, request: Request, limit: int | None = Query(None)):
+    agents = request.app.state.agents
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+
+    agent = agents[agent_id]
+    ingestion_pipeline = agent.get("ingestion")
+    if not ingestion_pipeline:
+        raise HTTPException(500, "Ingestion pipeline not available")
+
+    scheduler = get_scheduler()
+    url = f"https://www.youtube.com/{handle}"
+
+    scheduler.add_job(
+        ingestion_pipeline.run_channel,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        kwargs={"url": url, "limit": limit, "consolidate": False},
+        id=f"{agent_id}_{handle}_scan_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Scan history {handle} for {agent_id}",
+    )
+    logger.info(f"Triggered channel scan: {agent_id} / {handle} (limit={limit})")
     return {"status": "triggered", "agent_id": agent_id, "handle": handle}
 
 

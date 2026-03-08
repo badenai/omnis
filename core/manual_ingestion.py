@@ -106,7 +106,7 @@ class ManualIngestionPipeline:
             job_status.fail(agent_id, task, str(e))
             raise
 
-    def run_channel(self, url: str, limit: int | None = None) -> None:
+    def run_channel(self, url: str, limit: int | None = None, consolidate: bool = True) -> None:
         agent_id = self._config.agent_id
         task = "manual-ingest/channel"
         job_status.start(agent_id, task, f"Scanning channel: {url[:80]}")
@@ -151,7 +151,7 @@ class ManualIngestionPipeline:
                 state.mark_processed(v["id"])
             state.save()
 
-            if self._consolidation:
+            if self._consolidation and consolidate:
                 self._consolidation.run()
             job_status.complete(agent_id, task)
         except Exception as e:

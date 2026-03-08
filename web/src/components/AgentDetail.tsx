@@ -6,6 +6,7 @@ import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 import { useAgent, useDeleteAgent, useUpdateConfig, useUpdateSoul, useIntegrateSoul, useRevertSoul } from '../api/agents';
 import {
   useTriggerRun, useTriggerReevaluation, useTriggerCollection,
+  useTriggerConsolidation, useTriggerScan,
   useTriggerFactCheck, useResetSourceStatus, useJobs, useSoulSuggestions,
   useDiscoveredSources,
 } from '../api/scheduler';
@@ -404,11 +405,14 @@ export default function AgentDetail() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('knowledge');
   const [newHandle, setNewHandle] = useState('');
   const [msg, setMsg] = useState('');
+  const [scanDialog, setScanDialog] = useState<{ handle: string } | null>(null);
 
   const triggerRun = useTriggerRun(id!);
   const updateConfig = useUpdateConfig(id!);
   const triggerReevaluation = useTriggerReevaluation(id!);
   const triggerCollection = useTriggerCollection(id!);
+  const triggerConsolidation = useTriggerConsolidation(id!);
+  const triggerScan = useTriggerScan(id!);
   const triggerFactCheck = useTriggerFactCheck(id!);
   const resetSourceStatus = useResetSourceStatus(id!);
   const { data: jobs } = useJobs();
@@ -501,6 +505,9 @@ export default function AgentDetail() {
             <button disabled style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5, visibility: 'hidden', pointerEvents: 'none' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" /><span>Reevaluate</span>
             </button>
+            <button disabled style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5, visibility: 'hidden', pointerEvents: 'none' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" /><span>Consolidate Now</span>
+            </button>
             <button disabled style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', display: 'flex', alignItems: 'center', gap: 5, visibility: 'hidden', pointerEvents: 'none' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" /><span>Run Now</span>
             </button>
@@ -527,6 +534,47 @@ export default function AgentDetail() {
           {/* ChatPanel fills full height; its own paddingTop clears the floating header */}
           <div style={{ height: '100%', position: 'relative', zIndex: 1 }}>
             <ChatPanel agentId={agent.agent_id} soul={agent.soul} />
+          </div>
+        </div>
+      )}
+
+      {/* Scan history dialog */}
+      {scanDialog && (
+        <div
+          onClick={() => setScanDialog(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-default)', borderRadius: 12, padding: 24, width: 300, display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>Scan Channel History</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-muted)' }}>{scanDialog.handle}</div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>How many videos?</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {([{ label: '10 videos', value: 10 }, { label: '50 videos', value: 50 }, { label: '100 videos', value: 100 }, { label: 'All videos', value: null }] as const).map(({ label, value }) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setScanDialog(null);
+                    act(() => triggerScan.mutateAsync({ handle: scanDialog.handle, limit: value }), `Scanning ${label} from ${scanDialog.handle}...`);
+                  }}
+                  style={{ padding: '8px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 7, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setScanDialog(null)}
+              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 7, border: '1px solid var(--color-border-subtle)', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -565,6 +613,18 @@ export default function AgentDetail() {
             >
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               Reevaluate
+            </button>
+            {/* Consolidate Now */}
+            <button
+              onClick={() => act(() => triggerConsolidation.mutateAsync(), 'Consolidation triggered.')}
+              disabled={triggerConsolidation.isPending}
+              style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, cursor: 'pointer', backgroundColor: agent?.inbox_count ? 'rgba(234,179,8,0.12)' : 'transparent', color: agent?.inbox_count ? 'var(--color-status-warn)' : 'var(--color-text-secondary)', border: agent?.inbox_count ? '1px solid rgba(234,179,8,0.35)' : '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+              Consolidate Now
+              {!!agent?.inbox_count && (
+                <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-status-warn)', backgroundColor: 'rgba(234,179,8,0.2)', padding: '0px 5px', borderRadius: 99, lineHeight: 1.6 }}>{agent.inbox_count}</span>
+              )}
             </button>
             {/* Run Now */}
             <button
@@ -819,6 +879,14 @@ export default function AgentDetail() {
                                   )}
                                 </div>
                                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flexShrink: 0 }}>
+                                  <button
+                                    onClick={() => setScanDialog({ handle })}
+                                    disabled={triggerScan.isPending}
+                                    style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
+                                  >
+                                    <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                    scan history
+                                  </button>
                                   <button
                                     onClick={() => handleCollect(handle)}
                                     style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
