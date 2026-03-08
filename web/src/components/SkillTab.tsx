@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 import { useSkill, useSkillQuality, useSkillAudit, useSkillDiff } from '../api/knowledge';
-import { useTriggerAuditSkill } from '../api/scheduler';
+import { useTriggerAuditSkill, useActivityStream } from '../api/scheduler';
 import type { StructureIssue, QualityHistoryEntry } from '../types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -386,6 +387,22 @@ export default function SkillTab({ agentId }: Props) {
   const { data: skillData } = useSkill(agentId);
   const { data: diffData } = useSkillDiff(agentId);
   const triggerAudit = useTriggerAuditSkill(agentId);
+  const { active } = useActivityStream();
+  const qc = useQueryClient();
+
+  // Invalidate audit + skill data when the audit-skill job for this agent completes
+  const prevActiveKeys = useRef<string[]>([]);
+  useEffect(() => {
+    const currentKeys = active
+      .filter(j => j.agent_id === agentId && j.task === 'audit-skill')
+      .map(j => j.key);
+    const prev = prevActiveKeys.current;
+    const justFinished = prev.filter(k => !currentKeys.includes(k));
+    if (justFinished.length > 0) {
+      qc.invalidateQueries({ queryKey: ['knowledge', agentId] });
+    }
+    prevActiveKeys.current = currentKeys;
+  }, [active, agentId, qc]);
 
   const skillContent = skillData?.content ?? '';
   const hasDiff = !!diffData?.old_content;

@@ -90,6 +90,7 @@ class ConsolidationPipeline:
             skill_changed = sw.write(skill_content, self._config.agent_id)
             job_status.log(agent_id, task, "SKILL.md written")
             self._run_skill_eval_safely(skill_content)
+            self._run_structure_audit_safely()
 
             reg = Registry(DATA_DIR / "registry.json")
             reg.register(self._config.agent_id, self._dir / "SKILL.md")
@@ -174,6 +175,7 @@ class ConsolidationPipeline:
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
             self._run_skill_eval_safely(skill_content)
+            self._run_structure_audit_safely()
 
             reg = Registry(DATA_DIR / "registry.json")
             reg.register(self._config.agent_id, self._dir / "SKILL.md")
@@ -257,6 +259,32 @@ class ConsolidationPipeline:
             )
         except Exception as e:
             logger.warning(f"[{agent_id}] Skill quality check failed (non-fatal): {e}")
+
+    def _run_structure_audit_safely(self) -> None:
+        """Run SKILL.md structure audit after consolidation; swallow errors."""
+        from core.constants import APP_NAME
+        from core.description_optimizer import run_structure_audit
+        agent_id = self._config.agent_id
+        task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
+        skill_dir = (
+            pathlib.Path.home()
+            / ".claude" / "plugins" / "cache"
+            / APP_NAME / APP_NAME / "1.0.0"
+            / "skills" / agent_id
+        )
+        if not skill_dir.exists():
+            return
+        try:
+            job_status.update_step(agent_id, task, "Auditing SKILL.md structure…")
+            run_structure_audit(
+                agent_dir=self._dir,
+                agent_id=agent_id,
+                skill_dir=skill_dir,
+                provider=self._provider,
+                job_log_fn=job_status.log,
+            )
+        except Exception as e:
+            logger.warning(f"[{agent_id}] Structure audit failed (non-fatal): {e}")
 
     def _call_thesis_validation_safely(self) -> None:
         """Run thesis validation; swallow errors so consolidation succeeds."""
