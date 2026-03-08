@@ -48,7 +48,7 @@ SSH_CMD="ssh $SSH_OPTS $CONTAINER_USER@$CONTAINER_HOST"
 REMOTE_DIR="/root/.omnis/agents/$AGENT_ID"
 
 echo "Syncing agent '$AGENT_ID' → $CONTAINER_HOST:$REMOTE_DIR ..."
-rsync -az \
+rsync -az --delete \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
   -e "ssh $SSH_OPTS" \
