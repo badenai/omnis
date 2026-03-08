@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useInbox } from '../api/knowledge';
 
-export interface InboxItem {
+interface InboxItem {
   timestamp: string;
   channel: string;
   videoId: string;
@@ -14,7 +14,7 @@ export interface InboxItem {
   raw: string;
 }
 
-export function parseInboxItem(raw: string): InboxItem {
+function parseInboxItem(raw: string): InboxItem {
   const lines = raw.split('\n');
 
   const headerMatch = lines[0]?.match(/^##\s+(.+?)\s+\|\s+(.+?)\s+\|\s+(.+)$/);

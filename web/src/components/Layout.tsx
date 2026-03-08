@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useActivityStream } from '../api/scheduler';
 import ActivityDrawer from './ActivityDrawer';
@@ -36,16 +36,15 @@ export default function Layout() {
   const historyCount = history.length;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const prevCountRef = useRef(0);
+  const [prevActiveCount, setPrevActiveCount] = useState(activeCount);
 
-  // Auto-open drawer when a job starts (only on 0 → 1+ transition)
-  useEffect(() => {
-    const prev = prevCountRef.current;
-    prevCountRef.current = activeCount;
-    if (activeCount > 0 && prev === 0) {
+  // Auto-open drawer on 0 → 1+ transition (derived state update during render)
+  if (prevActiveCount !== activeCount) {
+    setPrevActiveCount(activeCount);
+    if (prevActiveCount === 0 && activeCount > 0 && !drawerOpen) {
       setDrawerOpen(true);
     }
-  }, [activeCount]);
+  }
 
   return (
     <div

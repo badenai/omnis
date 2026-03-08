@@ -78,8 +78,6 @@ function ScoreArc({ value, color, label, sub }: {
 
   const fillDeg = displayed * ARC_SWEEP;
   const fillPath = fillDeg > 2 ? arcPath(fillDeg) : '';
-  const arcLen = 2 * Math.PI * ARC_R * (ARC_SWEEP / 360);
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <div style={{ position: 'relative', width: 100, height: 72 }}>

@@ -38,7 +38,8 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
     return isNaN(n) ? DEFAULT_H : Math.min(MAX_H, Math.max(MIN_H, n));
   });
 
-  const dragging = useRef(false);
+  const draggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
   const startH = useRef(0);
 
@@ -51,18 +52,20 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
 
   function onHandleMouseDown(e: React.MouseEvent) {
     e.preventDefault();
-    dragging.current = true;
+    draggingRef.current = true;
+    setIsDragging(true);
     startY.current = e.clientY;
     startH.current = height;
 
     const onMove = (ev: MouseEvent) => {
-      if (!dragging.current) return;
+      if (!draggingRef.current) return;
       const delta = startY.current - ev.clientY;
       const next = Math.min(MAX_H, Math.max(MIN_H, startH.current + delta));
       setHeight(next);
     };
     const onUp = () => {
-      dragging.current = false;
+      draggingRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       // Persist
@@ -83,7 +86,7 @@ export default function ActivityDrawer({ open, onClose, activeCount, historyCoun
         height: open ? height : 0,
         overflow: 'hidden',
         flexShrink: 0,
-        transition: dragging.current ? 'none' : 'height 240ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: isDragging ? 'none' : 'height 240ms cubic-bezier(0.4, 0, 0.2, 1)',
         borderTop: open ? '1px solid var(--color-border-default)' : 'none',
         backgroundColor: 'var(--color-surface-1)',
         display: 'flex',

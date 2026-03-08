@@ -4,19 +4,20 @@ import type { LogEntry } from '../types';
 
 function RetryCountdown({ msg, ts }: { msg: string; ts: string }) {
   const match = msg.match(/retrying in (\d+)s/);
-  if (!match) return null;
-  const waitSecs = parseInt(match[1]);
+  const waitSecs = match ? parseInt(match[1]) : 0;
 
   const calcRemaining = () =>
-    Math.max(0, waitSecs - (Date.now() - new Date(ts).getTime()) / 1000);
+    waitSecs > 0 ? Math.max(0, waitSecs - (Date.now() - new Date(ts).getTime()) / 1000) : 0;
 
   const [remaining, setRemaining] = useState(calcRemaining);
 
   useEffect(() => {
-    if (remaining <= 0) return;
+    if (!match || remaining <= 0) return;
     const id = setInterval(() => setRemaining(calcRemaining()), 250);
     return () => clearInterval(id);
   }, [waitSecs, ts]);  // eslint-disable-line
+
+  if (!match) return null;
 
   if (remaining <= 0) {
     return (
@@ -52,14 +53,16 @@ function RetryCountdown({ msg, ts }: { msg: string; ts: string }) {
 }
 
 function useElapsed(startedAt: string): string {
-  const [, tick] = useState(0);
+  const [elapsed, setElapsed] = useState(() =>
+    Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
+  );
   useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
+    const startMs = new Date(startedAt).getTime();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startMs) / 1000)), 1000);
     return () => clearInterval(id);
-  }, []);
-  const secs = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  }, [startedAt]);
+  if (elapsed < 60) return `${elapsed}s`;
+  return `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
 }
 
 function duration(startedAt: string, finishedAt: string): string {
