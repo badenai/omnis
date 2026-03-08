@@ -87,12 +87,15 @@ def trigger_scan(agent_id: str, handle: str, request: Request, limit: int | None
 
     scheduler = get_scheduler()
     url = f"https://www.youtube.com/{handle}"
+    _limit = limit  # capture for closure
+
+    def _do_scan():
+        ingestion_pipeline.run_channel(url, _limit, False)
 
     scheduler.add_job(
-        ingestion_pipeline.run_channel,
+        _do_scan,
         trigger="date",
         run_date=datetime.now(timezone.utc),
-        kwargs={"url": url, "limit": limit, "consolidate": False},
         id=f"{agent_id}_{handle}_scan_{datetime.now(timezone.utc).timestamp():.0f}",
         name=f"Scan history {handle} for {agent_id}",
     )

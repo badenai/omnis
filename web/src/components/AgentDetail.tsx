@@ -406,6 +406,7 @@ export default function AgentDetail() {
   const [newHandle, setNewHandle] = useState('');
   const [msg, setMsg] = useState('');
   const [scanDialog, setScanDialog] = useState<{ handle: string } | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const triggerRun = useTriggerRun(id!);
   const updateConfig = useUpdateConfig(id!);
@@ -511,6 +512,7 @@ export default function AgentDetail() {
             <button disabled style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', display: 'flex', alignItems: 'center', gap: 5, visibility: 'hidden', pointerEvents: 'none' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" /><span>Run Now</span>
             </button>
+            <button disabled style={{ padding: '5px 8px', fontSize: 11, borderRadius: 7, border: '1px solid transparent', visibility: 'hidden', pointerEvents: 'none' }}>?</button>
             {/* Separator */}
             <div style={{ width: 1, height: 28, backgroundColor: 'var(--color-border-subtle)', flexShrink: 0 }} />
             {/* Chat / Manage toggle */}
@@ -583,6 +585,42 @@ export default function AgentDetail() {
       {viewMode === 'manage' && (
         <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
 
+          {/* Help reference panel */}
+          {showHelp && (
+            <div style={{ position: 'absolute', top: 84, left: '50%', transform: 'translateX(-50%)', zIndex: 9, backgroundColor: 'rgba(13,13,15,0.94)', backdropFilter: 'blur(14px)', border: '1px solid var(--color-border-subtle)', borderRadius: 12, padding: '18px 20px', width: 460, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--color-text-muted)', fontWeight: 600 }}>Pipeline Actions</div>
+              {([
+                { icon: '↻', name: 'Reevaluate', color: 'var(--color-text-secondary)', desc: 'Re-score all knowledge files using the current soul. Run after editing the soul to reprioritize what the agent has already learned.' },
+                { icon: '◎', name: 'Consolidate Now', color: agent.inbox_count ? 'var(--color-status-warn)' : 'var(--color-text-secondary)', desc: 'Process all pending inbox items into the knowledge base, then regenerate digest.md and SKILL.md.' },
+                { icon: '▶', name: 'Run Now', color: 'var(--color-accent)', desc: 'Full daily pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).' },
+              ] as const).map(({ icon, name, color, desc }) => (
+                <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color, flexShrink: 0, width: 16, textAlign: 'center', marginTop: 1 }}>{icon}</span>
+                  <div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color, letterSpacing: '0.02em' }}>{name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 8, lineHeight: 1.5 }}>{desc}</span>
+                  </div>
+                </div>
+              ))}
+              <div style={{ height: 1, backgroundColor: 'var(--color-border-subtle)', margin: '2px 0' }} />
+              <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--color-text-muted)', fontWeight: 600 }}>Channel Actions</div>
+              {([
+                { icon: '⌕', name: 'scan history', color: 'var(--color-status-warn)', desc: "Scan the channel's full video history against your soul. Relevant videos are added to inbox. Does not auto-consolidate." },
+                { icon: '↓', name: 'collect', color: 'var(--color-text-secondary)', desc: 'Fetch the latest new videos from this channel and analyze against the soul. Results go to inbox. Does not auto-consolidate.' },
+                { icon: '✓', name: 'fact-check', color: 'var(--color-text-secondary)', desc: 'Re-evaluate source credibility. Clears the flagged status if the channel passes the quality check.' },
+                { icon: '↺', name: 'reactivate', color: 'var(--color-status-ok)', desc: 'Remove a paused or flagged status and resume collecting from this channel.' },
+              ] as const).map(({ icon, name, color, desc }) => (
+                <div key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color, flexShrink: 0, width: 16, textAlign: 'center', marginTop: 1 }}>{icon}</span>
+                  <div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color, letterSpacing: '0.02em' }}>{name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 8, lineHeight: 1.5 }}>{desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Floating centered pill header */}
           <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10, backgroundColor: 'rgba(13,13,15,0.85)', backdropFilter: 'blur(12px)', border: '1px solid var(--color-border-subtle)', borderRadius: 14, padding: '10px 20px 10px 14px', display: 'flex', alignItems: 'center', gap: 20, whiteSpace: 'nowrap' }}>
             {/* Avatar */}
@@ -609,6 +647,7 @@ export default function AgentDetail() {
             <button
               onClick={() => act(() => triggerReevaluation.mutateAsync(), 'Reevaluation triggered.')}
               disabled={triggerReevaluation.isPending}
+              title="Re-score all knowledge files using the current soul. Run after editing the soul to reprioritize what the agent has already learned."
               style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, cursor: 'pointer', backgroundColor: 'transparent', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -618,6 +657,7 @@ export default function AgentDetail() {
             <button
               onClick={() => act(() => triggerConsolidation.mutateAsync(), 'Consolidation triggered.')}
               disabled={triggerConsolidation.isPending}
+              title="Process all pending inbox items into the knowledge base, then regenerate digest.md and SKILL.md."
               style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, cursor: 'pointer', backgroundColor: agent?.inbox_count ? 'rgba(234,179,8,0.12)' : 'transparent', color: agent?.inbox_count ? 'var(--color-status-warn)' : 'var(--color-text-secondary)', border: agent?.inbox_count ? '1px solid rgba(234,179,8,0.35)' : '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
@@ -630,10 +670,21 @@ export default function AgentDetail() {
             <button
               onClick={() => act(() => triggerRun.mutateAsync(), 'Run triggered.')}
               disabled={triggerRun.isPending}
+              title="Full daily pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled)."
               style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer', backgroundColor: 'var(--color-accent)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Run Now
+            </button>
+            {/* Help toggle */}
+            <button
+              onClick={() => setShowHelp(h => !h)}
+              title="Show action reference"
+              style={{ padding: '5px 8px', fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, borderRadius: 7, border: '1px solid var(--color-border-subtle)', backgroundColor: showHelp ? 'var(--color-surface-3)' : 'transparent', color: showHelp ? 'var(--color-text-secondary)' : 'var(--color-text-muted)', cursor: 'pointer', lineHeight: 1 }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+              onMouseLeave={e => { if (!showHelp) e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+            >
+              ?
             </button>
             {/* Separator */}
             <div style={{ width: 1, height: 28, backgroundColor: 'var(--color-border-subtle)', flexShrink: 0 }} />
@@ -882,6 +933,7 @@ export default function AgentDetail() {
                                   <button
                                     onClick={() => setScanDialog({ handle })}
                                     disabled={triggerScan.isPending}
+                                    title="Scan this channel's full video history against your soul. Relevant videos are added to inbox. Does not auto-consolidate."
                                     style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
                                   >
                                     <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -889,6 +941,7 @@ export default function AgentDetail() {
                                   </button>
                                   <button
                                     onClick={() => handleCollect(handle)}
+                                    title="Fetch the latest new videos from this channel and analyze against the soul. Results go to inbox. Does not auto-consolidate."
                                     style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
                                   >
                                     <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -898,6 +951,7 @@ export default function AgentDetail() {
                                     <>
                                       <button
                                         onClick={() => handleFactCheck(handle)}
+                                        title="Re-evaluate source credibility. Clears the flagged status if the channel passes the quality check."
                                         style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                       >
                                         <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -905,6 +959,7 @@ export default function AgentDetail() {
                                       </button>
                                       <button
                                         onClick={() => handleResetSource(handle)}
+                                        title="Remove the paused or flagged status and resume collecting from this channel."
                                         style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)', color: 'var(--color-status-ok)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                       >
                                         <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>

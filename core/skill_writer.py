@@ -1,6 +1,8 @@
 import difflib
 import json
 import pathlib
+import re
+import shutil
 from datetime import datetime, timezone
 
 from core.constants import APP_NAME
@@ -9,11 +11,36 @@ _PLUGIN_KEY = f"{APP_NAME}@{APP_NAME}"
 _PLUGIN_VERSION = "1.0.0"
 
 
+def _sanitize_yaml_fence(content: str) -> str:
+    """Strip erroneous code fence around YAML frontmatter if present.
+
+    Only matches at the absolute start of the string (^ without MULTILINE),
+    so mid-document ```yaml``` blocks in the content body are never touched.
+    """
+    return re.sub(
+        r'^```(?:yaml)?\s*\n(---\n(?:(?!---\n```).)*\n---)\n```\s*',
+        r'\1\n',
+        content,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
 class SkillWriter:
     def __init__(self, agent_dir: pathlib.Path):
         self._agent_dir = agent_dir
 
     def write(self, skill_content: str, agent_id: str) -> bool:
+        skill_content = _sanitize_yaml_fence(skill_content)
+
+        # Append knowledge base section referencing bundled references
+        knowledge_section = (
+            "\n\n## Knowledge Base\n"
+            "When detailed knowledge context is needed, read `references/digest.md` for the full knowledge digest.\n"
+            "For a quick map of all knowledge topics: `references/_index.md`."
+        )
+        skill_content = skill_content.rstrip() + knowledge_section
+
         # Local copy inside the agent directory
         local = self._agent_dir / "SKILL.md"
 
@@ -32,6 +59,16 @@ class SkillWriter:
         skill_dir = install_path / "skills" / agent_id
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
+
+        # Bundle reference files for progressive disclosure
+        refs_dir = skill_dir / "references"
+        refs_dir.mkdir(exist_ok=True)
+        digest_src = self._agent_dir / "digest.md"
+        if digest_src.exists():
+            shutil.copy2(digest_src, refs_dir / "digest.md")
+        index_src = self._agent_dir / "knowledge" / "_index.md"
+        if index_src.exists():
+            shutil.copy2(index_src, refs_dir / "_index.md")
 
         self._register_plugin(install_path)
 
