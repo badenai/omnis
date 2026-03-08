@@ -257,6 +257,7 @@ function RetryButton({ job }: { job: JobActivity }) {
 
 function HistoryJob({ job }: { job: JobActivity }) {
   const ok = job.state === 'completed';
+  const lastLog = job.logs.length > 0 ? job.logs[job.logs.length - 1].msg : null;
   return (
     <div className="flex items-start gap-2 py-1">
       <span
@@ -280,6 +281,11 @@ function HistoryJob({ job }: { job: JobActivity }) {
         {!ok && job.error && (
           <div className="text-[10px] truncate" title={job.error} style={{ color: 'var(--color-status-error)', marginTop: 1 }}>
             {job.error}
+          </div>
+        )}
+        {ok && lastLog && (
+          <div className="text-[10px] truncate" title={lastLog} style={{ color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+            {lastLog}
           </div>
         )}
       </div>

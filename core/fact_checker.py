@@ -53,8 +53,9 @@ class FactChecker:
         try:
             summaries = self._collect_summaries(source_id)
             if not summaries:
-                logger.info(f"[{agent_id}] No summaries found for {source_id}, skipping fact-check.")
-                job_status.complete(agent_id, task)
+                msg = f"No inbox entries for {source_id} — run collection first"
+                logger.info(f"[{agent_id}] {msg}")
+                job_status.fail(agent_id, task, msg)
                 return
 
             job_status.update_step(agent_id, task, "Running fact-check with web search...")
@@ -66,9 +67,10 @@ class FactChecker:
             report = self._provider._generate_with_search(prompt)
 
             job_status.update_step(agent_id, task, "Writing fact-check report...")
-            self._write_report(source_id, report)
+            report_path = self._write_report(source_id, report)
 
             logger.info(f"[{agent_id}] Fact-check complete for {source_id}")
+            job_status.log(agent_id, task, f"Report written → {report_path}")
             job_status.complete(agent_id, task)
 
         except Exception as e:
@@ -105,7 +107,7 @@ class FactChecker:
 
         return "\n\n---\n\n".join(summaries[-10:])
 
-    def _write_report(self, source_id: str, report: str) -> None:
+    def _write_report(self, source_id: str, report: str) -> str:
         month = datetime.now(timezone.utc).strftime("%Y-%m")
         safe_id = source_id.lstrip("@").replace("/", "-")
         dest = self._dir / "knowledge" / "recent" / month / f"fact-check-{safe_id}.md"
@@ -119,3 +121,4 @@ class FactChecker:
             f"*Generated: {ts}*\n\n"
         )
         dest.write_text(header + report, encoding="utf-8")
+        return f"knowledge/recent/{month}/fact-check-{safe_id}.md"
