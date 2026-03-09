@@ -279,8 +279,6 @@ class GeminiProvider:
         return self._generate(contents, model=self._consolidation_model_name)
 
     def generate_skill(self, digest: str, soul: str, agent_id: str) -> str:
-        from datetime import date
-        today = date.today().isoformat()
         contents = (
             f"AGENT SOUL:\n{soul}\n\n"
             f"AGENT ID: {agent_id}\n\n"
@@ -296,27 +294,24 @@ class GeminiProvider:
             f"                 no workflow summary, just the situations that activate this skill,\n"
             f"                 third-person, never starts with 'I' or 'You'>\n"
             f"   ---\n\n"
-            f"2. ## Overview\n"
-            f"   One-sentence core principle. Then announce line:\n"
-            f"   'Announce at start: I am using the {agent_id} skill.'\n"
-            f"   Then: '*Knowledge last updated: {today}*'\n\n"
-            f"3. ## When to Use\n"
-            f"   Explicit trigger conditions as bullets. Include 'When NOT to use' if relevant.\n\n"
-            f"4. ## The Iron Law\n"
+            f"2. ## The Iron Law\n"
             f"   The single non-negotiable constraint, in a fenced code block for emphasis.\n\n"
-            f"5. ## Behavioral Rules\n"
-            f"   Imperative rules using MUST / NEVER / BEFORE / WHEN.\n"
-            f"   Action-oriented: 'BEFORE writing X, verify Y' — not 'X is a technique that...'\n\n"
-            f"6. ## Red Flags\n"
+            f"3. ## Behavioral Rules\n"
+            f"   Specific conditional rules: 'Before writing X, verify Y' / 'When Z happens, do W'.\n"
+            f"   Prefer explaining WHY over blanket MUST/NEVER/ALWAYS in ALL CAPS.\n"
+            f"   Limit all-caps emphasis to 4 or fewer instances total.\n\n"
+            f"4. ## Red Flags\n"
             f"   A table of domain-specific rationalizations someone would actually think,\n"
             f"   paired with why each is wrong. Format: | Rationalization | Why It's Wrong |\n\n"
-            f"7. ## Quick Reference\n"
+            f"5. ## Quick Reference\n"
             f"   Compact table: Allowed vs. Forbidden (or equivalent checklist).\n\n"
             f"Writing rules:\n"
             f"- Extract BEHAVIORAL CONSTRAINTS from the knowledge — not the knowledge itself\n"
             f"- Every sentence must be imperative or conditional, never descriptive\n"
             f"- Red flags must be realistic excuses, not generic ones\n"
-            f"- Concise and scannable: Claude reads this before acting, not for research\n\n"
+            f"- Concise and scannable: Claude reads this before acting, not for research\n"
+            f"- Trigger conditions belong in the description field only — do NOT add a 'When to Use' section\n"
+            f"- Do NOT add 'Announce at start' lines, metadata timestamps, or introductory prose\n\n"
             f"KNOWLEDGE DIGEST (extract behavioral rules from this — do not summarize it):\n"
             f"{digest}"
         )

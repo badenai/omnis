@@ -11,6 +11,21 @@ _PLUGIN_KEY = f"{APP_NAME}@{APP_NAME}"
 _PLUGIN_VERSION = "1.0.0"
 
 
+def _sanitize_structure(content: str) -> str:
+    """Strip known structural anti-patterns that reduce audit score.
+
+    Applied as a post-processing pass after LLM generation — catches anything
+    that slips through despite the prompt instructions.
+    """
+    # Remove 'Announce at start: ...' lines (audit criterion: announce_at_start)
+    content = re.sub(r'^\s*Announce at start:.*\n?', '', content, flags=re.MULTILINE)
+    # Remove '*Knowledge last updated: ...*' timestamp lines (criterion: knowledge_date_line)
+    content = re.sub(r'^\s*\*Knowledge last updated:.*\*\s*\n?', '', content, flags=re.MULTILINE)
+    # Remove '## When to Use' sections if Gemini adds them anyway (criterion: when_to_use_in_body)
+    content = re.sub(r'^#{1,3} When to Use\n(?:(?!^#).|\n)*', '', content, flags=re.MULTILINE)
+    return content
+
+
 def _sanitize_yaml_fence(content: str) -> str:
     """Strip erroneous code fence around YAML frontmatter if present.
 
@@ -32,12 +47,12 @@ class SkillWriter:
 
     def write(self, skill_content: str, agent_id: str) -> bool:
         skill_content = _sanitize_yaml_fence(skill_content)
+        skill_content = _sanitize_structure(skill_content)
 
         # Append knowledge base section referencing bundled references
         knowledge_section = (
             "\n\n## Knowledge Base\n"
-            "When detailed knowledge context is needed, read `references/digest.md` for the full knowledge digest.\n"
-            "For a quick map of all knowledge topics: `references/_index.md`."
+            "When detailed knowledge context is needed, read `references/digest.md` for the full knowledge digest."
         )
         skill_content = skill_content.rstrip() + knowledge_section
 
@@ -66,9 +81,6 @@ class SkillWriter:
         digest_src = self._agent_dir / "digest.md"
         if digest_src.exists():
             shutil.copy2(digest_src, refs_dir / "digest.md")
-        index_src = self._agent_dir / "knowledge" / "_index.md"
-        if index_src.exists():
-            shutil.copy2(index_src, refs_dir / "_index.md")
 
         self._register_plugin(install_path)
 

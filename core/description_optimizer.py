@@ -279,11 +279,18 @@ def apply_structure_fixes(
         job_log_fn(agent_id, task, "Rewrite returned invalid content (no frontmatter) — skipping")
         return False
 
-    # Backup + write plugin copy
-    (skill_dir / "SKILL.previous.md").write_text(skill_content, encoding="utf-8")
+    # Write plugin cache copy (no backup here — backups belong in agent_dir only)
     skill_path.write_text(new_content, encoding="utf-8")
 
-    # Write agent-dir copy
+    # Re-copy references so the plugin cache stays consistent
+    import shutil
+    refs_dir = skill_dir / "references"
+    refs_dir.mkdir(exist_ok=True)
+    digest_src = agent_dir / "digest.md"
+    if digest_src.exists():
+        shutil.copy2(digest_src, refs_dir / "digest.md")
+
+    # Write agent-dir copy with backup
     agent_skill = agent_dir / "SKILL.md"
     if agent_skill.exists():
         (agent_dir / "SKILL.previous.md").write_text(
@@ -291,7 +298,7 @@ def apply_structure_fixes(
         )
     agent_skill.write_text(new_content, encoding="utf-8")
 
-    job_log_fn(agent_id, task, "Rewrite applied — SKILL.previous.md saved as backup")
+    job_log_fn(agent_id, task, "Rewrite applied — SKILL.previous.md saved as backup in agent dir")
     return True
 
 
