@@ -145,6 +145,8 @@ def create_agent(body: AgentConfigCreate, request: Request):
         raise HTTPException(409, f"Agent '{body.agent_id}' already exists")
 
     agent_dir = AGENTS_DIR / body.agent_id
+    if agent_dir.resolve().parent != AGENTS_DIR.resolve():
+        raise HTTPException(400, "Invalid agent_id")
     if agent_dir.exists():
         raise HTTPException(409, f"Agent directory already exists")
 

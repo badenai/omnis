@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, field_validator
 
 
 class SkillEvalConfig(BaseModel):
@@ -22,6 +24,13 @@ class AgentDecay(BaseModel):
 class AgentConfigCreate(BaseModel):
     agent_id: str
     model: str = "gemini"
+
+    @field_validator("agent_id")
+    @classmethod
+    def validate_agent_id(cls, v: str) -> str:
+        if not re.match(r"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$", v):
+            raise ValueError("agent_id must contain only lowercase letters, digits, and hyphens, and cannot start or end with a hyphen")
+        return v
     analysis_mode: str = "transcript_only"
     sources: AgentSources = AgentSources()
     consolidation_schedule: str = "0 3 * * 0"
