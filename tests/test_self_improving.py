@@ -80,6 +80,62 @@ def test_self_improving_no_findings_does_not_create_inbox(tmp_path):
     assert not (tmp_path / "INBOX.md").exists()
 
 
+def test_self_improving_sources_processed_even_with_no_findings(tmp_path):
+    import yaml
+    config_path = tmp_path / "config.yaml"
+    config_data = {
+        "agent_id": "test-agent", "model": "gemini",
+        "analysis_mode": "transcript_only",
+        "sources": {"youtube_channels": [{"handle": "@Existing"}]},
+        "consolidation_schedule": "0 3 * * 0",
+        "decay": {"half_life_days": 365}, "self_improving": True,
+    }
+    config_path.write_text(yaml.dump(config_data), encoding="utf-8")
+
+    config = make_config()
+    provider = MagicMock()
+    # No findings but a new channel discovered
+    provider.research_domain.return_value = ([], [make_source("@NewChannel")])
+
+    session = SelfImprovingSession(tmp_path, config, provider, "soul text")
+    session.run()
+
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    assert "@NewChannel" in handles
+    assert not (tmp_path / "INBOX.md").exists()  # no inbox created without findings
+
+
+def test_auto_add_sources_normalizes_handle_without_at(tmp_path):
+    import yaml
+    config_path = tmp_path / "config.yaml"
+    config_data = {
+        "agent_id": "test-agent", "model": "gemini",
+        "analysis_mode": "transcript_only",
+        "sources": {"youtube_channels": []},
+        "consolidation_schedule": "0 3 * * 0",
+        "decay": {"half_life_days": 365}, "self_improving": True,
+    }
+    config_path.write_text(yaml.dump(config_data), encoding="utf-8")
+
+    config = make_config()
+    config.sources = {"youtube_channels": []}
+    # Gemini returned handle without @ prefix
+    bare_source = DiscoveredSource(
+        url="https://youtube.com/SomeChannel", source_type="youtube_channel",
+        handle="SomeChannel", rationale="Good channel",
+        discovered_at="2026-01-01T00:00:00+00:00")
+    provider = MagicMock()
+    provider.research_domain.return_value = ([make_finding()], [bare_source])
+
+    session = SelfImprovingSession(tmp_path, config, provider, "soul text")
+    session.run()
+
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    assert "@SomeChannel" in handles
+
+
 def test_self_improving_provider_failure_propagates(tmp_path):
     config = make_config()
     provider = MagicMock()

@@ -35,15 +35,16 @@ class SelfImprovingSession:
                 existing_sources=existing_sources,
             )
 
-            if not findings:
-                logger.info("Self-improving session returned no findings.")
+            if not findings and not new_sources:
+                logger.info("Self-improving session returned no findings or sources.")
                 job_status.complete(agent_id, task)
                 return
 
-            job_status.update_step(agent_id, task, f"Writing {len(findings)} findings to inbox...")
-            inbox = InboxWriter(self._dir)
-            for finding in findings:
-                self._append_finding_to_inbox(inbox, finding)
+            if findings:
+                job_status.update_step(agent_id, task, f"Writing {len(findings)} findings to inbox...")
+                inbox = InboxWriter(self._dir)
+                for finding in findings:
+                    self._append_finding_to_inbox(inbox, finding)
 
             if new_sources:
                 job_status.update_step(agent_id, task, f"Logging {len(new_sources)} discovered sources...")
@@ -108,10 +109,14 @@ class SelfImprovingSession:
         }
         added = []
         for s in sources:
-            if s.source_type == "youtube_channel" and s.handle and s.handle not in existing_handles:
-                self._config.sources.setdefault("youtube_channels", []).append({"handle": s.handle})
-                existing_handles.add(s.handle)
-                added.append(s.handle)
+            if s.source_type != "youtube_channel" or not s.handle:
+                continue
+            handle = s.handle if s.handle.startswith("@") else f"@{s.handle}"
+            if handle in existing_handles:
+                continue
+            self._config.sources.setdefault("youtube_channels", []).append({"handle": handle})
+            existing_handles.add(handle)
+            added.append(handle)
         if added:
             import yaml
             from core.config import save_agent_config
