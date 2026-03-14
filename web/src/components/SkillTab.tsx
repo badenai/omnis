@@ -218,9 +218,10 @@ interface LeftPanelProps {
   agentId: string;
   onAudit: () => void;
   isPending: boolean;
+  error?: string | null;
 }
 
-function LeftPanel({ agentId, onAudit, isPending }: LeftPanelProps) {
+function LeftPanel({ agentId, onAudit, isPending, error }: LeftPanelProps) {
   const { data: quality } = useSkillQuality(agentId);
   const { data: audit } = useSkillAudit(agentId);
 
@@ -287,6 +288,11 @@ function LeftPanel({ agentId, onAudit, isPending }: LeftPanelProps) {
         {auditTs && (
           <p style={{ margin: '6px 0 0', fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-disabled)', textAlign: 'center' }}>
             last run {relativeTime(auditTs)}
+          </p>
+        )}
+        {error && (
+          <p style={{ margin: '6px 0 0', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-status-error)', textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>
+            {error}
           </p>
         )}
       </div>
@@ -382,11 +388,13 @@ interface Props {
 
 export default function SkillTab({ agentId }: Props) {
   const [view, setView] = useState<'content' | 'diff'>('content');
+  const [auditError, setAuditError] = useState<string | null>(null);
   const { data: skillData } = useSkill(agentId);
   const { data: diffData } = useSkillDiff(agentId);
   const triggerAudit = useTriggerAuditSkill(agentId);
   const { active } = useActivityStream();
   const qc = useQueryClient();
+  const isJobRunning = active.some(j => j.agent_id === agentId && j.task === 'audit-skill');
 
   // Invalidate audit + skill data when the audit-skill job for this agent completes
   const prevActiveKeys = useRef<string[]>([]);
@@ -406,13 +414,18 @@ export default function SkillTab({ agentId }: Props) {
   const hasDiff = !!diffData?.old_content;
 
   function handleAudit() {
-    triggerAudit.mutateAsync().catch(() => {});
+    setAuditError(null);
+    triggerAudit.mutateAsync().catch((e: unknown) => {
+      const raw = e instanceof Error ? e.message : String(e);
+      const match = raw.match(/"detail":"([^"]+)"/);
+      setAuditError(match ? match[1] : raw);
+    });
   }
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left: gauges + issues */}
-      <LeftPanel agentId={agentId} onAudit={handleAudit} isPending={triggerAudit.isPending} />
+      <LeftPanel agentId={agentId} onAudit={handleAudit} isPending={triggerAudit.isPending || isJobRunning} error={auditError} />
 
       {/* Right: content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
