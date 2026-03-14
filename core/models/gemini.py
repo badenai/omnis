@@ -278,7 +278,7 @@ class GeminiProvider:
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
-    def generate_skill(self, digest: str, soul: str, agent_id: str) -> str:
+    def generate_skill(self, digest: str, soul: str, agent_id: str, learnings: str | None = None) -> str:
         contents = (
             f"AGENT SOUL:\n{soul}\n\n"
             f"AGENT ID: {agent_id}\n\n"
@@ -312,6 +312,13 @@ class GeminiProvider:
             f"- Concise and scannable: Claude reads this before acting, not for research\n"
             f"- Trigger conditions belong in the description field only — do NOT add a 'When to Use' section\n"
             f"- Do NOT add 'Announce at start' lines, metadata timestamps, or introductory prose\n\n"
+        )
+        if learnings:
+            contents += (
+                f"## Anti-Patterns to Avoid (learned from past regressions)\n"
+                f"{learnings}\n\n"
+            )
+        contents += (
             f"KNOWLEDGE DIGEST (extract behavioral rules from this — do not summarize it):\n"
             f"{digest}"
         )
@@ -712,7 +719,7 @@ class GeminiProvider:
                 skill_score, bare_score = b_score, a_score
 
             eval_results.append(PromptEvalResult(
-                prompt=item.get("prompt", test_prompts[i] if i < len(test_prompts) else ""),
+                prompt=test_prompts[i] if i < len(test_prompts) else item.get("prompt", ""),
                 with_skill_score=skill_score,
                 without_skill_score=bare_score,
                 delta=skill_score - bare_score,

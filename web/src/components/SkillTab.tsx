@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { useSkill, useSkillQuality, useSkillAudit, useSkillDiff } from '../api/knowledge';
+import { useSkill, useSkillQuality, useSkillAudit, useSkillDiff, useRollbackSkill } from '../api/knowledge';
 import { useTriggerAuditSkill, useActivityStream } from '../api/scheduler';
 import type { StructureIssue, QualityHistoryEntry } from '../types';
 
@@ -219,9 +219,14 @@ interface LeftPanelProps {
   onAudit: () => void;
   isPending: boolean;
   error?: string | null;
+  onRollback: () => void;
+  isRollbackPending: boolean;
+  canRollback: boolean;
+  rollbackError?: string | null;
 }
 
-function LeftPanel({ agentId, onAudit, isPending, error }: LeftPanelProps) {
+function LeftPanel({ agentId, onAudit, isPending, error, onRollback, isRollbackPending, canRollback, rollbackError }: LeftPanelProps) {
+  const [confirmRollback, setConfirmRollback] = useState(false);
   const { data: quality } = useSkillQuality(agentId);
   const { data: audit } = useSkillAudit(agentId);
 
@@ -293,6 +298,78 @@ function LeftPanel({ agentId, onAudit, isPending, error }: LeftPanelProps) {
         {error && (
           <p style={{ margin: '6px 0 0', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-status-error)', textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>
             {error}
+          </p>
+        )}
+      </div>
+
+      {/* Rollback button */}
+      <div style={{ padding: '10px 16px 10px', borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0 }}>
+        {confirmRollback ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={{ margin: 0, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-status-warn)', textAlign: 'center', lineHeight: 1.4 }}>
+              Revert to previous SKILL.md?
+            </p>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => { setConfirmRollback(false); onRollback(); }}
+                style={{
+                  flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600,
+                  fontFamily: 'var(--font-sans)', borderRadius: 6, border: 'none',
+                  cursor: 'pointer', backgroundColor: 'var(--color-status-error)', color: '#fff',
+                }}
+              >
+                Revert
+              </button>
+              <button
+                onClick={() => setConfirmRollback(false)}
+                style={{
+                  flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600,
+                  fontFamily: 'var(--font-sans)', borderRadius: 6,
+                  border: '1px solid var(--color-border-default)', cursor: 'pointer',
+                  backgroundColor: 'var(--color-surface-2)', color: 'var(--color-text-secondary)',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmRollback(true)}
+            disabled={!canRollback || isRollbackPending}
+            title={!canRollback ? 'No previous version available' : 'Revert SKILL.md to previous version and analyze the regression'}
+            style={{
+              width: '100%', padding: '6px 0', fontSize: 11, fontWeight: 600,
+              fontFamily: 'var(--font-sans)', borderRadius: 6,
+              border: '1px solid var(--color-border-default)',
+              cursor: (!canRollback || isRollbackPending) ? 'default' : 'pointer',
+              backgroundColor: 'var(--color-surface-2)',
+              color: (!canRollback || isRollbackPending) ? 'var(--color-text-disabled)' : 'var(--color-text-secondary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              opacity: (!canRollback || isRollbackPending) ? 0.5 : 1,
+              transition: 'opacity 150ms',
+            }}
+          >
+            {isRollbackPending ? (
+              <>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+                  <path d="M6 2a4 4 0 1 0 4 4" />
+                </svg>
+                Rolling back…
+              </>
+            ) : (
+              <>
+                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                  <path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6 6-6" />
+                </svg>
+                Rollback Skill
+              </>
+            )}
+          </button>
+        )}
+        {rollbackError && (
+          <p style={{ margin: '5px 0 0', fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-status-error)', textAlign: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}>
+            {rollbackError}
           </p>
         )}
       </div>
@@ -389,18 +466,21 @@ interface Props {
 export default function SkillTab({ agentId }: Props) {
   const [view, setView] = useState<'content' | 'diff'>('content');
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
   const { data: skillData } = useSkill(agentId);
   const { data: diffData } = useSkillDiff(agentId);
   const triggerAudit = useTriggerAuditSkill(agentId);
+  const rollback = useRollbackSkill(agentId);
   const { active } = useActivityStream();
   const qc = useQueryClient();
   const isJobRunning = active.some(j => j.agent_id === agentId && j.task === 'audit-skill');
+  const isRollbackRunning = active.some(j => j.agent_id === agentId && j.task === 'rollback');
 
-  // Invalidate audit + skill data when the audit-skill job for this agent completes
+  // Invalidate audit + skill data when the audit-skill or rollback job for this agent completes
   const prevActiveKeys = useRef<string[]>([]);
   useEffect(() => {
     const currentKeys = active
-      .filter(j => j.agent_id === agentId && j.task === 'audit-skill')
+      .filter(j => j.agent_id === agentId && (j.task === 'audit-skill' || j.task === 'rollback'))
       .map(j => j.key);
     const prev = prevActiveKeys.current;
     const justFinished = prev.filter(k => !currentKeys.includes(k));
@@ -422,10 +502,28 @@ export default function SkillTab({ agentId }: Props) {
     });
   }
 
+  function handleRollback() {
+    setRollbackError(null);
+    rollback.mutateAsync().catch((e: unknown) => {
+      const raw = e instanceof Error ? e.message : String(e);
+      const match = raw.match(/"detail":"([^"]+)"/);
+      setRollbackError(match ? match[1] : raw);
+    });
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left: gauges + issues */}
-      <LeftPanel agentId={agentId} onAudit={handleAudit} isPending={triggerAudit.isPending || isJobRunning} error={auditError} />
+      <LeftPanel
+        agentId={agentId}
+        onAudit={handleAudit}
+        isPending={triggerAudit.isPending || isJobRunning}
+        error={auditError}
+        onRollback={handleRollback}
+        isRollbackPending={rollback.isPending || isRollbackRunning}
+        canRollback={!!diffData?.old_content}
+        rollbackError={rollbackError}
+      />
 
       {/* Right: content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>

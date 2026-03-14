@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { KnowledgeFile, KnowledgeFileContent, QualityHistory, SkillAudit } from '../types';
 
@@ -94,5 +94,15 @@ export function useSkillAudit(agentId: string) {
     retry: false,
     staleTime: 0,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useRollbackSkill(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch(`/knowledge/${agentId}/rollback`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['knowledge', agentId] });
+    },
   });
 }

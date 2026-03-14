@@ -1,9 +1,12 @@
 import pathlib
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.knowledge import KnowledgeWriter
+from core import job_status
+from core.scheduler_instance import get_scheduler
 from api.schemas import KnowledgeFile, KnowledgeFileContent
 
 logger = logging.getLogger(__name__)
@@ -130,6 +133,90 @@ def read_skill_audit(agent_id: str, request: Request):
         raise HTTPException(404, "No audit data — run 'Audit Skill' first")
     import json
     return json.loads(audit_path.read_text(encoding="utf-8"))
+
+
+@router.post("/{agent_id}/rollback")
+def rollback_skill(agent_id: str, request: Request):
+    """Revert SKILL.md to its previous version and analyze the regression.
+
+    Requires SKILL.previous.md to exist (written by SkillWriter on every skill change).
+    Returns 404 if no previous version is available.
+
+    Progress is tracked via job_status and visible in the activity stream.
+    """
+    agent = _get_agent(agent_id, request)
+    agent_dir: pathlib.Path = agent["dir"]
+    provider = agent["provider"]
+
+    previous_path = agent_dir / "SKILL.previous.md"
+    if not previous_path.exists():
+        raise HTTPException(404, "No previous skill version found — SKILL.previous.md does not exist")
+
+    scheduler = get_scheduler()
+
+    def _run():
+        task = "rollback"
+        job_status.start(agent_id, task, "Reverting SKILL.md to previous version…")
+        job_status.set_current(agent_id, task)
+        try:
+            from core.skill_writer import SkillWriter
+            from core.skill_quality import SkillQualityStore
+            from core.skill_regression_analyzer import analyze_regression, save_learnings
+
+            # Phase 1: Revert
+            job_status.update_step(agent_id, task, "Phase 1/3 — reverting skill…")
+            sw = SkillWriter(agent_dir)
+            reverted = sw.revert_to_previous(agent_id)
+            if not reverted:
+                job_status.fail(agent_id, task, "Revert failed — SKILL.previous.md missing")
+                return
+            job_status.log(agent_id, task, "Reverted SKILL.md to previous version")
+
+            # Phase 2: Analyze regression
+            job_status.update_step(agent_id, task, "Phase 2/3 — analyzing regression cause…")
+            quality_path = agent_dir / "skill_quality.json"
+            score_before, score_after = None, None
+            if quality_path.exists():
+                import json
+                try:
+                    history = json.loads(quality_path.read_text("utf-8"))
+                    if len(history) >= 2:
+                        score_after = history[0].get("score")
+                        score_before = history[1].get("score")
+                    elif history:
+                        score_after = history[0].get("score")
+                except Exception:
+                    pass
+
+            analysis = analyze_regression(agent_dir, provider)
+            if analysis:
+                job_status.log(agent_id, task, "Regression analysis complete")
+                save_learnings(agent_dir, analysis, agent_id, score_before=score_before, score_after=score_after)
+                job_status.log(agent_id, task, "Learnings saved to skill_learnings.md")
+            else:
+                job_status.log(agent_id, task, "⚠ Regression analysis failed — learnings not saved")
+
+            # Phase 3: Mark rollback in quality history
+            job_status.update_step(agent_id, task, "Phase 3/3 — marking rollback in quality history…")
+            store = SkillQualityStore(agent_dir)
+            store.mark_rollback()
+            job_status.log(agent_id, task, "Quality history updated with rollback marker")
+
+            job_status.complete(agent_id, task)
+
+        except Exception as e:
+            logger.error(f"[{agent_id}] Rollback failed: {e}")
+            job_status.fail(agent_id, task, str(e))
+
+    scheduler.add_job(
+        _run,
+        trigger="date",
+        run_date=datetime.now(timezone.utc),
+        id=f"{agent_id}_rollback_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Rollback skill {agent_id}",
+    )
+    logger.info(f"Triggered skill rollback: {agent_id}")
+    return {"status": "triggered", "agent_id": agent_id}
 
 
 @router.get("/{agent_id}/search")

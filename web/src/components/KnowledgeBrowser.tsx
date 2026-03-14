@@ -143,14 +143,17 @@ function EvolutionChart({ history, alert, latestScore }: EvolutionChartProps) {
 /** Collapsible session row in the history list. */
 function SessionRow({ entry, isLatest, alert }: { entry: QualityHistoryEntry; isLatest: boolean; alert: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const rowColor = isLatest && alert
+  const isRolledBack = !!entry.rollback;
+  const rowColor = isRolledBack
+    ? 'var(--color-text-disabled)'
+    : isLatest && alert
     ? 'var(--color-status-error)'
     : entry.score >= 0.75 ? 'var(--color-status-ok)'
     : entry.score >= 0.5 ? 'var(--color-status-warn)'
     : 'var(--color-status-error)';
 
   return (
-    <div style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+    <div style={{ borderBottom: '1px solid var(--color-border-subtle)', opacity: isRolledBack ? 0.45 : 1 }}>
       <button
         onClick={() => setExpanded(v => !v)}
         style={{
@@ -162,7 +165,7 @@ function SessionRow({ entry, isLatest, alert }: { entry: QualityHistoryEntry; is
         <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', minWidth: 56 }}>
           {formatDate(entry.timestamp)}
         </span>
-        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, color: rowColor, minWidth: 40 }}>
+        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, color: rowColor, minWidth: 40, textDecoration: isRolledBack ? 'line-through' : 'none' }}>
           {entry.score.toFixed(3)}
         </span>
         <span style={{
@@ -172,7 +175,16 @@ function SessionRow({ entry, isLatest, alert }: { entry: QualityHistoryEntry; is
         }}>
           {entry.skill_version.slice(0, 6)}
         </span>
-        {entry.eval_results.length > 0 && (
+        {isRolledBack && (
+          <span style={{
+            fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--color-status-warn)',
+            backgroundColor: 'rgba(245,158,11,0.08)', padding: '1px 5px', borderRadius: 3,
+            border: '1px solid rgba(245,158,11,0.2)', letterSpacing: '0.04em',
+          }}>
+            rolled back
+          </span>
+        )}
+        {!isRolledBack && entry.eval_results.length > 0 && (
           <div style={{ marginLeft: 4 }}>
             <DeltaBars results={entry.eval_results} />
           </div>

@@ -83,8 +83,12 @@ class ConsolidationPipeline:
             job_status.log(agent_id, task, f"digest.md written ({len(digest):,} chars)")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
+            from core.skill_regression_analyzer import read_learnings
+            learnings = read_learnings(self._dir)
+            if learnings:
+                job_status.log(agent_id, task, "Injecting regression learnings into skill generation…")
             skill_content = self._provider.generate_skill(
-                digest, self._soul, self._config.agent_id
+                digest, self._soul, self._config.agent_id, learnings=learnings
             )
             sw = SkillWriter(self._dir)
             skill_changed = sw.write(skill_content, self._config.agent_id)
@@ -171,7 +175,9 @@ class ConsolidationPipeline:
             (self._dir / "digest.md").write_text(digest, encoding="utf-8")
 
             job_status.update_step(agent_id, task, "Generating SKILL.md...")
-            skill_content = self._provider.generate_skill(digest, self._soul, self._config.agent_id)
+            from core.skill_regression_analyzer import read_learnings
+            learnings = read_learnings(self._dir)
+            skill_content = self._provider.generate_skill(digest, self._soul, self._config.agent_id, learnings=learnings)
             sw = SkillWriter(self._dir)
             sw.write(skill_content, self._config.agent_id)
             self._run_skill_eval_safely(skill_content)

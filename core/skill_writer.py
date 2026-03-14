@@ -102,6 +102,40 @@ class SkillWriter:
 
         return changed
 
+    def revert_to_previous(self, agent_id: str) -> bool:
+        """Revert SKILL.md to its previous version.
+
+        Saves the current (rejected) skill to SKILL.rejected.md for analysis,
+        then restores SKILL.previous.md as the active skill in both the agent
+        directory and the plugin cache.
+
+        Returns True on success, False if SKILL.previous.md does not exist.
+        """
+        previous_path = self._agent_dir / "SKILL.previous.md"
+        if not previous_path.exists():
+            return False
+
+        current_path = self._agent_dir / "SKILL.md"
+        if current_path.exists():
+            (self._agent_dir / "SKILL.rejected.md").write_text(
+                current_path.read_text("utf-8"), "utf-8"
+            )
+
+        previous_content = previous_path.read_text("utf-8")
+        current_path.write_text(previous_content, "utf-8")
+
+        # Mirror to plugin cache (same path as write())
+        install_path = (
+            pathlib.Path.home()
+            / ".claude" / "plugins" / "cache"
+            / APP_NAME / APP_NAME / _PLUGIN_VERSION
+        )
+        skill_dir = install_path / "skills" / agent_id
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(previous_content, "utf-8")
+
+        return True
+
     def _register_plugin(self, install_path: pathlib.Path) -> None:
         plugins_file = (
             pathlib.Path.home() / ".claude" / "plugins" / "installed_plugins.json"

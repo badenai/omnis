@@ -21,6 +21,7 @@ export interface QualityHistoryEntry {
   skill_version: string;
   timestamp: string;
   eval_results: PromptEvalResult[];
+  rollback?: boolean;
 }
 
 export interface QualityHistory {

@@ -58,5 +58,20 @@ class SkillQualityStore:
                 return True
         return False
 
+    def mark_rollback(self) -> None:
+        """Tag the bad entry as rolled-back and restore the previous score as current.
+
+        After this call, history[0] is the restored (good) entry and history[1] is
+        the rejected entry tagged with rollback=True. This ensures latest_score()
+        and is_alert() reflect the skill that is actually active.
+        """
+        if not self._history:
+            return
+        self._history[0]["rollback"] = True
+        if len(self._history) >= 2:
+            # Swap: bring the previous good entry back to front
+            self._history[0], self._history[1] = self._history[1], self._history[0]
+        self._save()
+
     def history(self) -> list[dict]:
         return list(self._history)
