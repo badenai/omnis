@@ -91,7 +91,7 @@ class AgentConfig:
     agent_id: str
     model: str                     # "gemini" | "openai" | "claude"
     analysis_mode: str             # "full_video" | "transcript_only"
-    sources: dict
+    sources: list
     consolidation_schedule: str
     decay: dict
     collection_model: str = "gemini-3-flash-preview"

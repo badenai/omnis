@@ -9,14 +9,6 @@ class SkillEvalConfig(BaseModel):
     enabled: bool = True
 
 
-class ChannelSource(BaseModel):
-    handle: str
-
-
-class AgentSources(BaseModel):
-    youtube_channels: list[ChannelSource] = []
-
-
 class AgentDecay(BaseModel):
     half_life_days: int = 365
 
@@ -32,7 +24,7 @@ class AgentConfigCreate(BaseModel):
             raise ValueError("agent_id must contain only lowercase letters, digits, and hyphens, and cannot start or end with a hyphen")
         return v
     analysis_mode: str = "transcript_only"
-    sources: AgentSources = AgentSources()
+    sources: list[dict] = []
     consolidation_schedule: str = "0 3 * * 0"
     decay: AgentDecay = AgentDecay()
     collection_model: str = "gemini-3-flash-preview"
@@ -45,7 +37,7 @@ class AgentConfigCreate(BaseModel):
 class AgentConfigUpdate(BaseModel):
     model: str | None = None
     analysis_mode: str | None = None
-    sources: AgentSources | None = None
+    sources: list[dict] | None = None
     consolidation_schedule: str | None = None
     decay: AgentDecay | None = None
     collection_model: str | None = None
@@ -63,7 +55,7 @@ class AgentSummary(BaseModel):
     model: str
     analysis_mode: str
     consolidation_schedule: str
-    channel_count: int
+    source_count: int
     last_consolidation: str | None = None
     inbox_count: int = 0
     knowledge_count: int = 0
@@ -84,7 +76,7 @@ class AgentDetail(BaseModel):
     agent_id: str
     model: str
     analysis_mode: str
-    sources: dict
+    sources: list[dict]
     consolidation_schedule: str
     decay: dict
     collection_model: str

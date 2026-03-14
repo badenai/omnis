@@ -368,7 +368,7 @@ const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'channels',
-    label: 'Channels',
+    label: 'Sources',
     icon: (
       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
@@ -413,7 +413,11 @@ export default function AgentDetail() {
   const [showIngest, setShowIngest] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('knowledge');
+  const [newSourceType, setNewSourceType] = useState<'youtube' | 'medium' | 'web_page' | 'reddit'>('youtube');
   const [newHandle, setNewHandle] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newSubreddit, setNewSubreddit] = useState('');
+  const [newMinScore, setNewMinScore] = useState(50);
   const [msg, setMsg] = useState('');
   const [scanDialog, setScanDialog] = useState<{ handle: string } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -431,7 +435,17 @@ export default function AgentDetail() {
 
   const agentJobs = useMemo(() => jobs?.filter(j => j.id.startsWith(id!)) ?? [], [jobs, id]);
   const nextJob = agentJobs.find(j => j.next_run_time);
-  const channels = agent?.sources.youtube_channels ?? [];
+  const sources = agent?.sources ?? [];
+
+  function getSourceId(s: { type: string; [key: string]: unknown }): string {
+    switch (s.type) {
+      case 'youtube': return s.handle as string;
+      case 'medium': return `medium:${s.handle}`;
+      case 'web_page': return s.url as string;
+      case 'reddit': return `reddit:r/${s.subreddit}`;
+      default: return String(s.handle || s.url || s.type);
+    }
+  }
 
 
   const { data: discoveredData } = useDiscoveredSources(id!);
@@ -446,23 +460,35 @@ export default function AgentDetail() {
     catch (e) { setMsg('Error: ' + (e as Error).message); }
   };
 
-  const handleCollect = (handle: string) => act(() => triggerCollection.mutateAsync(handle), `Collecting ${handle}...`);
-  const handleFactCheck = (handle: string) => act(() => triggerFactCheck.mutateAsync(handle), `Fact-checking ${handle}...`);
-  const handleResetSource = (handle: string) => act(() => resetSourceStatus.mutateAsync(handle), `Reactivated ${handle}.`);
+  const handleCollect = (sourceId: string) => act(() => triggerCollection.mutateAsync(sourceId), `Collecting ${sourceId}...`);
+  const handleFactCheck = (sourceId: string) => act(() => triggerFactCheck.mutateAsync(sourceId), `Fact-checking ${sourceId}...`);
+  const handleResetSource = (sourceId: string) => act(() => resetSourceStatus.mutateAsync(sourceId), `Reactivated ${sourceId}.`);
 
-  const handleAddChannel = async () => {
-    const handle = newHandle.trim();
-    if (!handle) return;
+  const handleAddSource = async () => {
+    let entry: Record<string, unknown> = { type: newSourceType };
+    if (newSourceType === 'youtube' || newSourceType === 'medium') {
+      if (!newHandle.trim()) return;
+      entry.handle = newHandle.trim();
+    } else if (newSourceType === 'web_page') {
+      if (!newUrl.trim()) return;
+      entry.url = newUrl.trim();
+    } else if (newSourceType === 'reddit') {
+      if (!newSubreddit.trim()) return;
+      entry.subreddit = newSubreddit.trim();
+      entry.min_score = newMinScore;
+    }
     await act(
-      () => updateConfig.mutateAsync({ sources: { youtube_channels: [...channels, { handle }] } }),
-      `Added ${handle}.`,
+      () => updateConfig.mutateAsync({ sources: [...sources, entry] }),
+      `Added ${newSourceType} source.`,
     );
     setNewHandle('');
+    setNewUrl('');
+    setNewSubreddit('');
   };
-  const handleRemoveChannel = (handle: string) =>
+  const handleRemoveSource = (sourceId: string) =>
     act(
-      () => updateConfig.mutateAsync({ sources: { youtube_channels: channels.filter(ch => ch.handle !== handle) } }),
-      `Removed ${handle}.`,
+      () => updateConfig.mutateAsync({ sources: sources.filter(s => getSourceId(s) !== sourceId) }),
+      `Removed ${sourceId}.`,
     );
 
   if (isLoading) return (
@@ -503,7 +529,7 @@ export default function AgentDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4 }}>{agent.model}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>·</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{channels.length} channels</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{sources.length} sources</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>·</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-ok)' }} />
@@ -643,7 +669,7 @@ export default function AgentDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4 }}>{agent.model}</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>·</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{channels.length} channels</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{sources.length} sources</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>·</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-ok)' }} />
@@ -836,52 +862,81 @@ export default function AgentDetail() {
                   </div>
                 )}
 
-                {/* Channels tab */}
+                {/* Sources tab */}
                 {activeTab === 'channels' && (
                   <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-                    {/* Add channel row */}
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <input
-                        type="text"
-                        value={newHandle}
-                        onChange={e => setNewHandle(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleAddChannel(); }}
-                        placeholder="@ChannelHandle"
-                        style={{ flex: 1, backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-default)', borderRadius: 8, padding: '7px 12px', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', outline: 'none' }}
-                        onFocus={e => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
-                        onBlur={e => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
-                      />
-                      <button
-                        onClick={handleAddChannel}
-                        disabled={!newHandle.trim() || updateConfig.isPending}
-                        style={{ padding: '7px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff', cursor: newHandle.trim() ? 'pointer' : 'default', opacity: newHandle.trim() ? 1 : 0.4, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
-                      >
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                        Add Channel
-                      </button>
+                    {/* Add source form */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select
+                          value={newSourceType}
+                          onChange={e => setNewSourceType(e.target.value as typeof newSourceType)}
+                          style={{ backgroundColor: 'var(--color-surface-3)', border: '1px solid var(--color-border-default)', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          <option value="youtube">YouTube</option>
+                          <option value="medium">Medium</option>
+                          <option value="web_page">Web Page</option>
+                          <option value="reddit">Reddit</option>
+                        </select>
+                        {(newSourceType === 'youtube' || newSourceType === 'medium') && (
+                          <input type="text" value={newHandle} onChange={e => setNewHandle(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAddSource(); }}
+                            placeholder={newSourceType === 'youtube' ? '@ChannelHandle' : '@author'}
+                            style={{ flex: 1, backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-default)', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', outline: 'none' }}
+                          />
+                        )}
+                        {newSourceType === 'web_page' && (
+                          <input type="text" value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAddSource(); }}
+                            placeholder="https://example.com/page"
+                            style={{ flex: 1, backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-default)', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', outline: 'none' }}
+                          />
+                        )}
+                        {newSourceType === 'reddit' && (
+                          <>
+                            <input type="text" value={newSubreddit} onChange={e => setNewSubreddit(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleAddSource(); }}
+                              placeholder="MachineLearning"
+                              style={{ flex: 1, backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-default)', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', outline: 'none' }}
+                            />
+                            <input type="number" value={newMinScore} onChange={e => setNewMinScore(Number(e.target.value))}
+                              placeholder="min score"
+                              style={{ width: 80, backgroundColor: 'var(--color-surface-1)', border: '1px solid var(--color-border-default)', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)', outline: 'none' }}
+                            />
+                          </>
+                        )}
+                        <button
+                          onClick={handleAddSource}
+                          disabled={updateConfig.isPending}
+                          style={{ padding: '6px 14px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
+                        >
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                          Add
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Channel cards */}
-                    {channels.length === 0 ? (
+                    {/* Source cards */}
+                    {sources.length === 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, color: 'var(--color-text-muted)', paddingTop: 40 }}>
                         <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ opacity: 0.4 }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
                         </svg>
-                        <span style={{ fontSize: 13 }}>No channels yet. Add one above.</span>
+                        <span style={{ fontSize: 13 }}>No sources yet. Add one above.</span>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {channels.map(ch => {
-                          const handle = ch.handle;
-                          const stats = agent.source_stats?.[handle];
-                          const lastChecked = agent.last_checked?.[handle];
+                        {sources.map((src) => {
+                          const sourceId = getSourceId(src);
+                          const stats = agent.source_stats?.[sourceId];
+                          const lastChecked = agent.last_checked?.[sourceId];
                           const status = stats?.status ?? 'active';
                           const scores = stats?.scores ?? [];
                           const avgScore = scores.length
                             ? (scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(2)
                             : null;
-                          const isDiscovered = discoveredHandles.has(handle);
+                          const isDiscovered = src.type === 'youtube' && discoveredHandles.has(src.handle as string);
 
                           const statusColor =
                             status === 'active' ? 'var(--color-status-ok)' :
@@ -892,9 +947,32 @@ export default function AgentDetail() {
                             status === 'flagged' ? 'rgba(239,68,68,0.1)' :
                             'rgba(107,114,128,0.1)';
 
+                          const sourceIcon = src.type === 'youtube' ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#ff0000', flexShrink: 0 }}>
+                              <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                            </svg>
+                          ) : src.type === 'medium' ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+                              <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zm7.42 0c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/>
+                            </svg>
+                          ) : src.type === 'reddit' ? (
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#ff4500', flexShrink: 0 }}>
+                              <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>
+                          );
+
+                          const displayLabel = src.type === 'youtube' ? String(src.handle)
+                            : src.type === 'medium' ? String(src.handle)
+                            : src.type === 'reddit' ? `r/${src.subreddit}`
+                            : String(src.url ?? sourceId);
+
                           return (
                             <div
-                              key={handle}
+                              key={sourceId}
                               style={{
                                 backgroundColor: isDiscovered ? 'var(--color-accent-glow)' : 'var(--color-surface-2)',
                                 border: isDiscovered ? '1px solid var(--color-accent-dim)' : '1px solid var(--color-border-subtle)',
@@ -904,14 +982,16 @@ export default function AgentDetail() {
                                 display: 'flex', flexDirection: 'column', gap: 8,
                               }}
                             >
-                              {/* Row 1: handle + badges + remove */}
+                              {/* Row 1: icon + label + type badge + status + remove */}
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#ff0000', flexShrink: 0 }}>
-                                    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                                  </svg>
-                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>{handle}</span>
+                                  {sourceIcon}
+                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{displayLabel}</span>
+                                  <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{src.type.replace('_', ' ')}</span>
                                   <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: statusColor, backgroundColor: statusBg, padding: '1px 7px', borderRadius: 99, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.07em' }}>{status}</span>
+                                  {src.type === 'reddit' && src.min_score && (
+                                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4 }}>≥{String(src.min_score)} pts</span>
+                                  )}
                                   {isDiscovered && (
                                     <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', border: '1px solid var(--color-accent-dim)', padding: '1px 7px', borderRadius: 99, fontWeight: 600, letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 3 }}>
                                       <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
@@ -920,8 +1000,8 @@ export default function AgentDetail() {
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => handleRemoveChannel(handle)}
-                                  title="Remove channel"
+                                  onClick={() => handleRemoveSource(sourceId)}
+                                  title="Remove source"
                                   style={{ padding: '2px 6px', fontSize: 14, borderRadius: 4, border: 'none', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}
                                   onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-status-error)')}
                                   onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
@@ -947,18 +1027,20 @@ export default function AgentDetail() {
                                   )}
                                 </div>
                                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flexShrink: 0 }}>
+                                  {src.type === 'youtube' && (
+                                    <button
+                                      onClick={() => setScanDialog({ handle: String(src.handle) })}
+                                      disabled={triggerScan.isPending}
+                                      title="Scan this channel's full video history against your soul."
+                                      style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
+                                    >
+                                      <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                      scan history
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={() => setScanDialog({ handle })}
-                                    disabled={triggerScan.isPending}
-                                    title="Scan this channel's full video history against your soul. Relevant videos are added to inbox. Does not auto-consolidate."
-                                    style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
-                                  >
-                                    <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                    scan history
-                                  </button>
-                                  <button
-                                    onClick={() => handleCollect(handle)}
-                                    title="Fetch the latest new videos from this channel and analyze against the soul. Results go to inbox. Does not auto-consolidate."
+                                    onClick={() => handleCollect(sourceId)}
+                                    title="Fetch new items from this source and analyze against the soul."
                                     style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.02em' }}
                                   >
                                     <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -967,16 +1049,16 @@ export default function AgentDetail() {
                                   {status === 'flagged' && (
                                     <>
                                       <button
-                                        onClick={() => handleFactCheck(handle)}
-                                        title="Re-evaluate source credibility. Clears the flagged status if the channel passes the quality check."
+                                        onClick={() => handleFactCheck(sourceId)}
+                                        title="Re-evaluate source credibility."
                                         style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(234,179,8,0.3)', backgroundColor: 'rgba(234,179,8,0.08)', color: 'var(--color-status-warn)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                       >
                                         <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         fact-check
                                       </button>
                                       <button
-                                        onClick={() => handleResetSource(handle)}
-                                        title="Remove the paused or flagged status and resume collecting from this channel."
+                                        onClick={() => handleResetSource(sourceId)}
+                                        title="Remove the paused or flagged status and resume collecting."
                                         style={{ padding: '3px 10px', fontSize: 10, fontWeight: 500, fontFamily: 'var(--font-mono)', borderRadius: 5, border: '1px solid rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)', color: 'var(--color-status-ok)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                                       >
                                         <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>

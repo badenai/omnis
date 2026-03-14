@@ -48,19 +48,34 @@ def trigger_run(agent_id: str, request: Request):
     return {"status": "triggered", "agent_id": agent_id}
 
 
-@router.post("/trigger/{agent_id}/collect/{handle}")
-def trigger_collection(agent_id: str, handle: str, request: Request, consolidate: bool = Query(True)):
+def _find_source_config(sources: list[dict], target_source_id: str) -> dict | None:
+    from core.sources import get_plugin
+    for config in sources:
+        try:
+            if get_plugin(config["type"]).get_source_id(config) == target_source_id:
+                return config
+        except Exception:
+            continue
+    return None
+
+
+@router.post("/trigger/{agent_id}/collect/{source_id:path}")
+def trigger_collection(agent_id: str, source_id: str, request: Request, consolidate: bool = Query(True)):
     agents = request.app.state.agents
     if agent_id not in agents:
         raise HTTPException(404, f"Agent '{agent_id}' not found")
 
     agent = agents[agent_id]
+    source_config = _find_source_config(agent["config"].sources, source_id)
+    if source_config is None:
+        raise HTTPException(404, f"Source '{source_id}' not found in agent '{agent_id}'")
+
     collection_pipeline = agent["collection"]
     consolidation_pipeline = agent["consolidation"]
     scheduler = get_scheduler()
 
-    def _collect_and_consolidate(handle: str):
-        collection_pipeline.run_collection(handle)
+    def _collect_and_consolidate(cfg: dict):
+        collection_pipeline.run_collection(cfg)
         if consolidate:
             consolidation_pipeline.run()
 
@@ -68,12 +83,12 @@ def trigger_collection(agent_id: str, handle: str, request: Request, consolidate
         _collect_and_consolidate,
         trigger="date",
         run_date=datetime.now(timezone.utc),
-        args=[handle],
-        id=f"{agent_id}_{handle}_manual_{datetime.now(timezone.utc).timestamp():.0f}",
-        name=f"Manual collect {handle} for {agent_id}",
+        args=[source_config],
+        id=f"{agent_id}_{source_id}_manual_{datetime.now(timezone.utc).timestamp():.0f}",
+        name=f"Manual collect {source_id} for {agent_id}",
     )
-    logger.info(f"Triggered collection (consolidate={consolidate}): {agent_id} / {handle}")
-    return {"status": "triggered", "agent_id": agent_id, "handle": handle}
+    logger.info(f"Triggered collection (consolidate={consolidate}): {agent_id} / {source_id}")
+    return {"status": "triggered", "agent_id": agent_id, "source_id": source_id}
 
 
 @router.post("/trigger/{agent_id}/scan/{handle}")

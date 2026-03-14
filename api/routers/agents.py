@@ -23,6 +23,7 @@ from api.schemas import (
     SoulUpdate,
     SourceStats,
 )
+
 from core.collector import get_channel_videos
 from yt_dlp.utils import DownloadError
 
@@ -55,7 +56,7 @@ def _agent_summary(agent: dict) -> AgentSummary:
         model=config.model,
         analysis_mode=config.analysis_mode,
         consolidation_schedule=config.consolidation_schedule,
-        channel_count=len(config.sources.get("youtube_channels", [])),
+        source_count=len(config.sources),
         last_consolidation=state._data.get("last_consolidation"),
         inbox_count=len(inbox.read_items()),
         knowledge_count=len(knowledge_files),
@@ -156,9 +157,7 @@ def create_agent(body: AgentConfigCreate, request: Request):
         "agent_id": body.agent_id,
         "model": body.model,
         "analysis_mode": body.analysis_mode,
-        "sources": {
-            "youtube_channels": [ch.model_dump() for ch in body.sources.youtube_channels]
-        },
+        "sources": body.sources,
         "consolidation_schedule": body.consolidation_schedule,
         "decay": body.decay.model_dump(),
         "collection_model": body.collection_model,
@@ -197,11 +196,7 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
         "agent_id": config.agent_id,
         "model": body.model if body.model is not None else config.model,
         "analysis_mode": body.analysis_mode if body.analysis_mode is not None else config.analysis_mode,
-        "sources": (
-            {"youtube_channels": [ch.model_dump() for ch in body.sources.youtube_channels]}
-            if body.sources is not None
-            else config.sources
-        ),
+        "sources": body.sources if body.sources is not None else config.sources,
         "consolidation_schedule": (
             body.consolidation_schedule if body.consolidation_schedule is not None else config.consolidation_schedule
         ),

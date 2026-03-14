@@ -1,6 +1,7 @@
 import pathlib
 import logging
-from core.collector import get_new_videos, fetch_transcript
+from datetime import datetime, timezone
+
 from core.state import AgentState
 from core.inbox import InboxWriter
 from core.models.types import AgentConfig
@@ -17,68 +18,65 @@ class CollectionPipeline:
         self._provider = provider
         self._soul = soul
 
-    def run_collection(self, source_id: str) -> None:
+    def run_collection(self, source_config: dict) -> None:
+        from core.sources import get_plugin
+        plugin = get_plugin(source_config["type"])
+        source_id = plugin.get_source_id(source_config)
         agent_id = self._config.agent_id
         task = f"collect/{source_id}"
 
-        # Check source health before starting
         state = AgentState(self._dir)
         stats = state.get_source_stats(source_id)
         if stats.get("status") in ("paused", "flagged"):
             logger.info(f"Skipping {source_id} (status: {stats['status']})")
             return
 
-        job_status.start(agent_id, task, f"Fetching new videos from {source_id}...")
+        job_status.start(agent_id, task, f"Collecting from {source_id}...")
         job_status.set_current(agent_id, task)
 
         try:
-            new_videos = get_new_videos(source_id, state.processed_ids)
-            if not new_videos:
-                logger.info(f"No new videos from {source_id}")
-                job_status.log(agent_id, task, f"No new videos from {source_id}")
+            items = plugin.fetch(source_config, state.processed_ids)
+            if not items:
+                logger.info(f"No new items from {source_id}")
+                job_status.log(agent_id, task, f"No new items from {source_id}")
                 job_status.complete(agent_id, task)
                 return
 
             inbox = InboxWriter(self._dir)
-            total = len(new_videos)
-            job_status.log(agent_id, task, f"Found {total} new video{'s' if total != 1 else ''} to analyze")
-            for i, video in enumerate(new_videos, 1):
-                vid_id = video["id"]
-                vid_title = video.get("title", "")
-                vid_url = video.get("webpage_url", f"https://www.youtube.com/watch?v={vid_id}")
+            total = len(items)
+            job_status.log(agent_id, task, f"Found {total} new item{'s' if total != 1 else ''} to analyze")
 
-                job_status.update_step(agent_id, task, f"Analyzing video {i}/{total}: {vid_title[:60]}...")
-                job_status.log(agent_id, task, f"[{i}/{total}] Calling Gemini: {vid_title[:60]}…")
+            for i, item in enumerate(items, 1):
+                job_status.update_step(agent_id, task, f"Analyzing item {i}/{total}: {item.title[:60]}...")
+                job_status.log(agent_id, task, f"[{i}/{total}] Calling provider: {item.title[:60]}…")
                 try:
-                    if self._config.analysis_mode == "full_video" and self._config.model == "gemini":
+                    if item.analysis_mode == "full_video":
                         result = self._provider.analyze_video(
-                            vid_id, vid_title, vid_url, self._soul,
+                            item.source_id, item.title, item.source_url, self._soul,
                             "Extract key insights relevant to this agent's domain.",
                         )
                     else:
-                        transcript = fetch_transcript(vid_id)
-                        result = self._provider.analyze_transcript(
-                            vid_id, vid_title, transcript, self._soul,
-                            "Extract key insights relevant to this agent's domain.",
+                        result = self._provider.analyze_web_content(
+                            item.source_url or "", item.content, item.title, self._soul,
                         )
 
                     inbox.append(source_id, result)
-                    state.mark_processed(vid_id)
+                    state.mark_processed(item.source_id)
                     state.record_source_score(source_id, result.relevance_score)
                     if result.credibility_signals:
                         state.record_source_credibility_flag(source_id, result.credibility_signals)
-                    logger.info(f"Processed {vid_id} (relevance: {result.relevance_score})")
+                    logger.info(f"Processed {item.source_id} (relevance: {result.relevance_score})")
 
                     score = result.relevance_score
                     first_insight = result.insights[0][:80] if result.insights else result.raw_summary[:80]
                     threshold_note = "" if score >= 0.3 else " — below threshold"
                     job_status.log(
                         agent_id, task,
-                        f'[{i}/{total}] "{vid_title[:50]}" — score {score:.2f}{threshold_note} — "{first_insight}"'
+                        f'[{i}/{total}] "{item.title[:50]}" — score {score:.2f}{threshold_note} — "{first_insight}"'
                     )
                 except Exception as e:
-                    logger.error(f"Failed to process {vid_id}: {e}")
-                    job_status.log(agent_id, task, f"[{i}/{total}] Failed: {vid_title[:50]} — {e}")
+                    logger.error(f"Failed to process {item.source_id}: {e}")
+                    job_status.log(agent_id, task, f"[{i}/{total}] Failed: {item.title[:50]} — {e}")
 
             self._check_source_health(state)
             stats = state.get_source_stats(source_id)
@@ -91,7 +89,6 @@ class CollectionPipeline:
                 f"Source health: {source_id} avg {avg:.2f} — {status} {status_icon}"
             )
 
-            from datetime import datetime, timezone
             state.update_last_checked(source_id, datetime.now(timezone.utc).isoformat())
             state.save()
             job_status.complete(agent_id, task)

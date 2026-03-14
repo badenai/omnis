@@ -223,7 +223,7 @@ export default function AgentList() {
                   {[
                     { label: 'Inbox', value: a.inbox_count, warn: a.inbox_count > 0 },
                     { label: 'Knowledge', value: a.knowledge_count, warn: false },
-                    { label: 'Channels', value: a.channel_count, warn: false },
+                    { label: 'Sources', value: a.source_count, warn: false },
                     {
                       label: 'Quality',
                       value: a.latest_quality_score != null ? a.latest_quality_score.toFixed(2) : '—',

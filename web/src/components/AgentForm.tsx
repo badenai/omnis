@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateAgent, useUpdateConfig } from '../api/agents';
-import type { AgentDetail, ChannelSource } from '../types';
-import ChannelList from './ChannelList';
+import type { AgentDetail } from '../types';
 import Tooltip from './Tooltip';
 import SoulAssistantPanel from './SoulAssistantPanel';
 
@@ -104,9 +103,6 @@ export default function AgentForm({ agent }: Props) {
   const [analysisMode, setAnalysisMode] = useState(agent?.analysis_mode ?? 'transcript_only');
   const [collectionModel, setCollectionModel] = useState(agent?.collection_model ?? 'gemini-3-flash-preview');
   const [consolidationModel, setConsolidationModel] = useState(agent?.consolidation_model ?? 'gemini-3.1-pro-preview');
-  const [channels, setChannels] = useState<ChannelSource[]>(
-    agent?.sources.youtube_channels ?? []
-  );
   const [runTime, setRunTime] = useState(
     cronToTime(agent?.consolidation_schedule ?? '0 3 * * *')
   );
@@ -151,7 +147,7 @@ export default function AgentForm({ agent }: Props) {
           agent_id: agentId,
           model,
           analysis_mode: analysisMode,
-          sources: { youtube_channels: channels },
+          sources: [],
           consolidation_schedule: timeToCron(runTime),
           decay: { half_life_days: halfLife },
           collection_model: collectionModel,
@@ -219,12 +215,6 @@ export default function AgentForm({ agent }: Props) {
           />
         </Field>
       </div>
-
-      {!isEdit && (
-        <Field label="YouTube Channels" tooltip="List of YouTube channel @handles to watch. The agent fetches new videos from each channel on every daily run and skips ones it has already processed.">
-          <ChannelList channels={channels} onChange={setChannels} />
-        </Field>
-      )}
 
       <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
         <StyledInput

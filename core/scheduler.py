@@ -6,15 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 def _run_daily(collection_pipeline, consolidation_pipeline, self_improving_session):
-    channels = [
-        ch["handle"]
-        for ch in collection_pipeline._config.sources.get("youtube_channels", [])
-    ]
-    for handle in channels:
+    for source_config in collection_pipeline._config.sources:
         try:
-            collection_pipeline.run_collection(handle)
+            collection_pipeline.run_collection(source_config)
         except Exception as e:
-            logger.warning(f"Collection failed for {handle}, skipping: {e}")
+            logger.warning(f"Collection failed for {source_config}, skipping: {e}")
     consolidation_pipeline.run()
     if self_improving_session and collection_pipeline._config.self_improving:
         self_improving_session.run()

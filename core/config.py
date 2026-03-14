@@ -10,7 +10,7 @@ def load_agent_config(config_path: pathlib.Path) -> AgentConfig:
         agent_id=data["agent_id"],
         model=data["model"],
         analysis_mode=data.get("analysis_mode", "transcript_only"),
-        sources=data.get("sources", {}),
+        sources=data.get("sources", []),
         consolidation_schedule=data.get("consolidation_schedule", "0 3 * * 0"),
         decay=data.get("decay", {"half_life_days": 365}),
         collection_model=data.get("collection_model", "gemini-3-flash-preview"),

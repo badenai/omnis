@@ -10,7 +10,7 @@ def make_config(agent_id="test-agent"):
     return AgentConfig(
         agent_id=agent_id, model="gemini",
         analysis_mode="transcript_only",
-        sources={"youtube_channels": [{"handle": "@Existing"}]},
+        sources=[{"type": "youtube", "handle": "@Existing"}],
         consolidation_schedule="0 3 * * 0",
         decay={"half_life_days": 365},
         self_improving=True)
@@ -51,7 +51,7 @@ def test_self_improving_logs_discovered_sources(tmp_path):
     config_data = {
         "agent_id": "test-agent", "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": [{"handle": "@Existing"}]},
+        "sources": [{"type": "youtube", "handle": "@Existing"}],
         "consolidation_schedule": "0 3 * * 0",
         "decay": {"half_life_days": 365}, "self_improving": True,
     }
@@ -86,7 +86,7 @@ def test_self_improving_sources_processed_even_with_no_findings(tmp_path):
     config_data = {
         "agent_id": "test-agent", "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": [{"handle": "@Existing"}]},
+        "sources": [{"type": "youtube", "handle": "@Existing"}],
         "consolidation_schedule": "0 3 * * 0",
         "decay": {"half_life_days": 365}, "self_improving": True,
     }
@@ -94,16 +94,15 @@ def test_self_improving_sources_processed_even_with_no_findings(tmp_path):
 
     config = make_config()
     provider = MagicMock()
-    # No findings but a new channel discovered
     provider.research_domain.return_value = ([], [make_source("@NewChannel")])
 
     session = SelfImprovingSession(tmp_path, config, provider, "soul text")
     session.run()
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    handles = [s["handle"] for s in raw["sources"] if s.get("type") == "youtube"]
     assert "@NewChannel" in handles
-    assert not (tmp_path / "INBOX.md").exists()  # no inbox created without findings
+    assert not (tmp_path / "INBOX.md").exists()
 
 
 def test_auto_add_sources_normalizes_handle_without_at(tmp_path):
@@ -112,15 +111,14 @@ def test_auto_add_sources_normalizes_handle_without_at(tmp_path):
     config_data = {
         "agent_id": "test-agent", "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": []},
+        "sources": [],
         "consolidation_schedule": "0 3 * * 0",
         "decay": {"half_life_days": 365}, "self_improving": True,
     }
     config_path.write_text(yaml.dump(config_data), encoding="utf-8")
 
     config = make_config()
-    config.sources = {"youtube_channels": []}
-    # Gemini returned handle without @ prefix
+    config.sources = []
     bare_source = DiscoveredSource(
         url="https://youtube.com/SomeChannel", source_type="youtube_channel",
         handle="SomeChannel", rationale="Good channel",
@@ -132,7 +130,7 @@ def test_auto_add_sources_normalizes_handle_without_at(tmp_path):
     session.run()
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    handles = [s["handle"] for s in raw["sources"] if s.get("type") == "youtube"]
     assert "@SomeChannel" in handles
 
 
@@ -153,7 +151,7 @@ def test_auto_add_sources_writes_new_channel_to_config(tmp_path):
         "agent_id": "test-agent",
         "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": [{"handle": "@Existing"}]},
+        "sources": [{"type": "youtube", "handle": "@Existing"}],
         "consolidation_schedule": "0 3 * * 0",
         "decay": {"half_life_days": 365},
         "self_improving": True,
@@ -168,7 +166,7 @@ def test_auto_add_sources_writes_new_channel_to_config(tmp_path):
     session.run()
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    handles = [s["handle"] for s in raw["sources"] if s.get("type") == "youtube"]
     assert "@NewChannel" in handles
     assert "@Existing" in handles
 
@@ -180,7 +178,7 @@ def test_auto_add_sources_skips_existing_channel(tmp_path):
         "agent_id": "test-agent",
         "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": [{"handle": "@Existing"}]},
+        "sources": [{"type": "youtube", "handle": "@Existing"}],
         "consolidation_schedule": "0 3 * * 0",
         "decay": {"half_life_days": 365},
         "self_improving": True,
@@ -189,33 +187,30 @@ def test_auto_add_sources_skips_existing_channel(tmp_path):
 
     config = make_config()
     provider = MagicMock()
-    # Discover a source that already exists
     provider.research_domain.return_value = ([make_finding()], [make_source("@Existing")])
 
     session = SelfImprovingSession(tmp_path, config, provider, "soul text")
     session.run()
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    handles = [ch["handle"] for ch in raw["sources"]["youtube_channels"]]
+    handles = [s["handle"] for s in raw["sources"] if s.get("type") == "youtube"]
     assert handles.count("@Existing") == 1
 
 
-def test_auto_add_sources_ignores_non_youtube(tmp_path):
+def test_auto_add_sources_adds_blog_as_web_page(tmp_path):
     import yaml
     config_path = tmp_path / "config.yaml"
     config_data = {
-        "agent_id": "test-agent",
-        "model": "gemini",
+        "agent_id": "test-agent", "model": "gemini",
         "analysis_mode": "transcript_only",
-        "sources": {"youtube_channels": []},
+        "sources": [],
         "consolidation_schedule": "0 3 * * 0",
-        "decay": {"half_life_days": 365},
-        "self_improving": True,
+        "decay": {"half_life_days": 365}, "self_improving": True,
     }
     config_path.write_text(yaml.dump(config_data), encoding="utf-8")
 
     config = make_config()
-    config.sources = {"youtube_channels": []}
+    config.sources = []
     blog_source = DiscoveredSource(
         url="https://example.com/blog", source_type="blog",
         handle=None, rationale="Good blog",
@@ -227,4 +222,9 @@ def test_auto_add_sources_ignores_non_youtube(tmp_path):
     session.run()
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    assert raw["sources"]["youtube_channels"] == []
+    # Blog source should be added as web_page
+    types = [s["type"] for s in raw["sources"]]
+    assert "web_page" in types
+    # No YouTube entries added
+    youtube_entries = [s for s in raw["sources"] if s.get("type") == "youtube"]
+    assert youtube_entries == []

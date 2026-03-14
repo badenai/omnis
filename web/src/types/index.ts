@@ -1,7 +1,3 @@
-export interface ChannelSource {
-  handle: string;
-}
-
 export interface SkillEvalConfig {
   prompts: string[];
   min_quality_threshold: number;
@@ -46,10 +42,6 @@ export interface SkillAudit {
   summary: string;
 }
 
-export interface AgentSources {
-  youtube_channels: ChannelSource[];
-}
-
 export interface AgentDecay {
   half_life_days: number;
 }
@@ -59,7 +51,7 @@ export interface AgentSummary {
   model: string;
   analysis_mode: string;
   consolidation_schedule: string;
-  channel_count: number;
+  source_count: number;
   last_consolidation: string | null;
   inbox_count: number;
   knowledge_count: number;
@@ -80,7 +72,7 @@ export interface AgentDetail {
   agent_id: string;
   model: string;
   analysis_mode: string;
-  sources: { youtube_channels?: ChannelSource[] };
+  sources: Array<{ type: string; [key: string]: unknown }>;
   consolidation_schedule: string;
   decay: { half_life_days: number };
   collection_model: string;
@@ -102,7 +94,7 @@ export interface AgentConfigCreate {
   agent_id: string;
   model: string;
   analysis_mode: string;
-  sources: AgentSources;
+  sources: Array<{ type: string; [key: string]: unknown }>;
   consolidation_schedule: string;
   decay: AgentDecay;
   collection_model: string;
@@ -115,7 +107,7 @@ export interface AgentConfigCreate {
 export interface AgentConfigUpdate {
   model?: string;
   analysis_mode?: string;
-  sources?: AgentSources;
+  sources?: Array<{ type: string; [key: string]: unknown }>;
   consolidation_schedule?: string;
   decay?: AgentDecay;
   collection_model?: string;

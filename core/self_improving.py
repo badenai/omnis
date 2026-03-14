@@ -64,8 +64,9 @@ class SelfImprovingSession:
 
     def _format_existing_sources(self) -> str:
         lines = []
-        for ch in self._config.sources.get("youtube_channels", []):
-            lines.append(f"- YouTube: {ch['handle']}")
+        for s in self._config.sources:
+            label = s.get("handle") or s.get("url") or s.get("subreddit", "")
+            lines.append(f"- {s['type'].title()}: {label}")
         discovered = self._dir / _DISCOVERED_SOURCES_FILE
         if discovered.exists():
             lines.append("\nPreviously discovered (already suggested):")
@@ -100,23 +101,34 @@ class SelfImprovingSession:
         dest.write_text(existing + "\n".join(new_entries), encoding="utf-8")
 
     def _auto_add_sources(self, sources: list[DiscoveredSource]) -> None:
-        """Add newly discovered YouTube channels to agent config (disk + memory)."""
+        """Add newly discovered sources to agent config (disk + memory)."""
+        import re
         if not sources:
             return
         existing_handles = {
-            ch["handle"]
-            for ch in self._config.sources.get("youtube_channels", [])
+            s["handle"]
+            for s in self._config.sources
+            if s.get("type") == "youtube" and s.get("handle")
         }
         added = []
         for s in sources:
-            if s.source_type != "youtube_channel" or not s.handle:
-                continue
-            handle = s.handle if s.handle.startswith("@") else f"@{s.handle}"
-            if handle in existing_handles:
-                continue
-            self._config.sources.setdefault("youtube_channels", []).append({"handle": handle})
-            existing_handles.add(handle)
-            added.append(handle)
+            if s.source_type == "youtube_channel" and s.handle:
+                handle = s.handle if s.handle.startswith("@") else f"@{s.handle}"
+                if handle in existing_handles:
+                    continue
+                self._config.sources.append({"type": "youtube", "handle": handle})
+                existing_handles.add(handle)
+                added.append(handle)
+            elif s.source_type in ("blog", "podcast") and s.url:
+                m = re.match(r'https://medium\.com/(@\w+)', s.url)
+                if m:
+                    self._config.sources.append({"type": "medium", "handle": m.group(1)})
+                else:
+                    self._config.sources.append({"type": "web_page", "url": s.url})
+                added.append(s.url)
+            elif s.source_type == "website" and s.url:
+                self._config.sources.append({"type": "web_page", "url": s.url})
+                added.append(s.url)
         if added:
             import yaml
             from core.config import save_agent_config
