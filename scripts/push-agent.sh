@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Usage: sync-agent.sh <agent-id> [--ssh-key=/path/to/key] [--restart]
+# Usage: push-agent.sh <agent-id> [--ssh-key=/path/to/key] [--restart]
 #
 # Copies a single agent from ~/.omnis/agents/<agent-id>/ to the deployment
 # server and optionally restarts the omnis service.
 set -e
 
-DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$DEPLOY_DIR/.ci.env"
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPTS_DIR/../deploy/.ci.env"
 
 AGENT_ID=""
 RESTART=false
@@ -23,7 +23,7 @@ for arg in "$@"; do
 done
 
 if [[ -z "$AGENT_ID" ]]; then
-  echo "Usage: sync-agent.sh <agent-id> [--ssh-key=/path/to/key] [--restart]"
+  echo "Usage: push-agent.sh <agent-id> [--ssh-key=/path/to/key] [--restart]"
   exit 1
 fi
 
@@ -47,14 +47,14 @@ SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=accept-new"
 SSH_CMD="ssh $SSH_OPTS $CONTAINER_USER@$CONTAINER_HOST"
 REMOTE_DIR="/root/.omnis/agents/$AGENT_ID"
 
-echo "Syncing agent '$AGENT_ID' → $CONTAINER_HOST:$REMOTE_DIR ..."
+echo "Pushing agent '$AGENT_ID' → $CONTAINER_HOST:$REMOTE_DIR ..."
 rsync -az --delete \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
   -e "ssh $SSH_OPTS" \
   "$LOCAL_DIR/" "$CONTAINER_USER@$CONTAINER_HOST:$REMOTE_DIR/"
 
-echo "Sync complete."
+echo "Push complete."
 
 if [[ "$RESTART" == "true" ]]; then
   echo "Restarting omnis service..."

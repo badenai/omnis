@@ -2,6 +2,7 @@ import pathlib
 import logging
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from core.query import QueryHandler
 
@@ -10,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 def build_mcp_server(agents: dict) -> FastMCP:
     """Build an MCP server exposing each agent as an ask_{id} tool."""
-    mcp = FastMCP("omnis")
+    # Disable DNS-rebinding protection so the SSE app works when mounted
+    # inside the FastAPI process (which binds to 0.0.0.0, not localhost).
+    mcp = FastMCP("omnis", transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
 
     @mcp.tool()
     def list_agents() -> list[dict]:

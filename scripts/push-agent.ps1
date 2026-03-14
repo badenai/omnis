@@ -6,4 +6,6 @@ $wslHome = '/mnt/' + $winHome[0].ToString().ToLower() + $winHome.Substring(2)
 $wslSshKey = "$wslHome/.ssh/id_ed25519_deploy"
 
 $wslOmnisDir = "$wslHome/.omnis/agents"
-bash deploy/fetch-agent.sh "--ssh-key=$wslSshKey" "--local-agents-dir=$wslOmnisDir" @args
+
+$wslScriptsDir = '/mnt/' + $PSScriptRoot[0].ToString().ToLower() + ($PSScriptRoot.Substring(2) -replace '\\', '/')
+bash "$wslScriptsDir/push-agent.sh" "--ssh-key=$wslSshKey" "--local-agents-dir=$wslOmnisDir" @args

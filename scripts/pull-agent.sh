@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Usage: fetch-agent.sh <agent-id> [--ssh-key=/path/to/key]
+# Usage: pull-agent.sh <agent-id> [--ssh-key=/path/to/key]
 #
 # Copies a single agent from the deployment server back into ~/.omnis/agents/<agent-id>/.
 set -e
 
-DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$DEPLOY_DIR/.ci.env"
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPTS_DIR/../deploy/.ci.env"
 
 AGENT_ID=""
 LOCAL_AGENTS_DIR="$HOME/.omnis/agents"
@@ -20,7 +20,7 @@ for arg in "$@"; do
 done
 
 if [[ -z "$AGENT_ID" ]]; then
-  echo "Usage: fetch-agent.sh <agent-id> [--ssh-key=/path/to/key]"
+  echo "Usage: pull-agent.sh <agent-id> [--ssh-key=/path/to/key]"
   exit 1
 fi
 
@@ -38,7 +38,7 @@ SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=accept-new"
 REMOTE_DIR="/root/.omnis/agents/$AGENT_ID"
 LOCAL_DIR="$LOCAL_AGENTS_DIR/$AGENT_ID"
 
-echo "Fetching agent '$AGENT_ID' from $CONTAINER_HOST:$REMOTE_DIR ..."
+echo "Pulling agent '$AGENT_ID' from $CONTAINER_HOST:$REMOTE_DIR ..."
 mkdir -p "$LOCAL_DIR"
 rsync -az \
   --exclude='__pycache__' \
@@ -46,4 +46,4 @@ rsync -az \
   -e "ssh $SSH_OPTS" \
   "$CONTAINER_USER@$CONTAINER_HOST:$REMOTE_DIR/" "$LOCAL_DIR/"
 
-echo "Fetch complete → $LOCAL_DIR"
+echo "Pull complete → $LOCAL_DIR"

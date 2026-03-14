@@ -20,7 +20,10 @@ ${domain} {
 %{ endfor ~}
     }
 %{ endif ~}
-    reverse_proxy ${omnis_ip}:8420
+    reverse_proxy ${omnis_ip}:8420 {
+        # Disable buffering — required for MCP SSE and scheduler activity streams
+        flush_interval -1
+    }
 }
 EOF
 
