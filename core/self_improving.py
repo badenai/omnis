@@ -1,5 +1,6 @@
 import pathlib
 import logging
+import re
 from datetime import datetime, timezone
 
 from core.inbox import InboxWriter
@@ -9,6 +10,20 @@ from core import job_status
 logger = logging.getLogger(__name__)
 
 _DISCOVERED_SOURCES_FILE = "discovered_sources.md"
+
+
+def _compute_source_id(s: "DiscoveredSource") -> str:
+    if s.source_type == "youtube_channel" and s.handle:
+        handle = s.handle if s.handle.startswith("@") else f"@{s.handle}"
+        return handle
+    if s.source_type in ("blog", "podcast") and s.url:
+        m = re.match(r'https://medium\.com/(@\w+)', s.url)
+        if m:
+            return f"medium:{m.group(1)}"
+        return s.url
+    if s.source_type == "website" and s.url:
+        return s.url
+    return s.handle or s.url or ""
 
 
 class SelfImprovingSession:
@@ -96,6 +111,7 @@ class SelfImprovingSession:
                 f"- **URL:** {s.url}\n"
                 f"- **Type:** {s.source_type}\n"
                 f"- **Handle:** {s.handle or 'N/A'}\n"
+                f"- **Source ID:** {_compute_source_id(s)}\n"
                 f"- **Rationale:** {s.rationale}\n"
             )
         dest.write_text(existing + "\n".join(new_entries), encoding="utf-8")
@@ -110,6 +126,16 @@ class SelfImprovingSession:
             for s in self._config.sources
             if s.get("type") == "youtube" and s.get("handle")
         }
+        existing_urls = {
+            s["url"]
+            for s in self._config.sources
+            if s.get("url")
+        }
+        existing_medium_handles = {
+            s["handle"]
+            for s in self._config.sources
+            if s.get("type") == "medium" and s.get("handle")
+        }
         added = []
         for s in sources:
             if s.source_type == "youtube_channel" and s.handle:
@@ -122,12 +148,22 @@ class SelfImprovingSession:
             elif s.source_type in ("blog", "podcast") and s.url:
                 m = re.match(r'https://medium\.com/(@\w+)', s.url)
                 if m:
-                    self._config.sources.append({"type": "medium", "handle": m.group(1)})
+                    medium_handle = m.group(1)
+                    if medium_handle in existing_medium_handles:
+                        continue
+                    self._config.sources.append({"type": "medium", "handle": medium_handle})
+                    existing_medium_handles.add(medium_handle)
                 else:
+                    if s.url in existing_urls:
+                        continue
                     self._config.sources.append({"type": "web_page", "url": s.url})
+                    existing_urls.add(s.url)
                 added.append(s.url)
             elif s.source_type == "website" and s.url:
+                if s.url in existing_urls:
+                    continue
                 self._config.sources.append({"type": "web_page", "url": s.url})
+                existing_urls.add(s.url)
                 added.append(s.url)
         if added:
             import yaml

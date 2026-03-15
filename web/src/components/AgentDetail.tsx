@@ -67,16 +67,16 @@ function parseSuggestions(markdown: string): Array<{ id: string; title: string; 
   return [{ id: '0', content: markdown.trim(), title: 'Soul Evolution Suggestions' }];
 }
 
-/** Returns the set of handles discovered by self-improvement after `since`. */
-function parseDiscoveredHandles(content: string, since: string | null): Set<string> {
+/** Returns the set of source IDs discovered by self-improvement after `since`. */
+function parseDiscoveredSourceIds(content: string, since: string | null): Set<string> {
   const result = new Set<string>();
   const blocks = content.split(/^## /m).slice(1);
   for (const block of blocks) {
     const tsLine = block.match(/^([^\n]+)/);
-    const handleLine = block.match(/\*\*Handle:\*\*\s*(@\S+)/);
-    if (!tsLine || !handleLine) continue;
+    const idLine = block.match(/\*\*Source ID:\*\*\s*(\S+)/);
+    if (!tsLine || !idLine) continue;
     if (since && new Date(tsLine[1].trim()) <= new Date(since)) continue;
-    result.add(handleLine[1]);
+    result.add(idLine[1]);
   }
   return result;
 }
@@ -449,8 +449,8 @@ export default function AgentDetail() {
 
 
   const { data: discoveredData } = useDiscoveredSources(id!);
-  const discoveredHandles = useMemo(
-    () => parseDiscoveredHandles(discoveredData?.content ?? '', agent?.last_consolidation ?? null),
+  const discoveredSourceIds = useMemo(
+    () => parseDiscoveredSourceIds(discoveredData?.content ?? '', agent?.last_consolidation ?? null),
     [discoveredData?.content, agent?.last_consolidation],
   );
 
@@ -712,6 +712,15 @@ export default function AgentDetail() {
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Run Now
             </button>
+            {/* Feed Knowledge */}
+            <button
+              onClick={() => setShowIngest(v => !v)}
+              title="Manually feed a document, URL, or text directly into the inbox."
+              style={{ padding: '6px 12px', fontSize: 12, fontWeight: 500, borderRadius: 8, cursor: 'pointer', backgroundColor: showIngest ? 'rgba(79,127,255,0.15)' : 'transparent', color: showIngest ? 'var(--color-accent)' : 'var(--color-text-secondary)', border: showIngest ? '1px solid var(--color-accent-dim)' : '1px solid var(--color-border-default)', display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+              Ingest
+            </button>
             {/* Help toggle */}
             <button
               onClick={() => setShowHelp(h => !h)}
@@ -936,7 +945,7 @@ export default function AgentDetail() {
                           const avgScore = scores.length
                             ? (scores.reduce((a: number, b: number) => a + b, 0) / scores.length).toFixed(2)
                             : null;
-                          const isDiscovered = src.type === 'youtube' && discoveredHandles.has(src.handle as string);
+                          const isDiscovered = discoveredSourceIds.has(getSourceId(src));
 
                           const statusColor =
                             status === 'active' ? 'var(--color-status-ok)' :
@@ -1178,34 +1187,19 @@ export default function AgentDetail() {
         </div>
       )}
 
-      {/* Ingest FAB + slide-overs */}
-      {viewMode === 'manage' && (
-        <>
-          <button
-            onClick={() => setShowIngest(v => !v)}
-            style={{ position: 'fixed', bottom: 32, right: inspectorOpen ? 32 + 360 + 12 : 32 + 40 + 12, transition: 'right 250ms cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 50, width: 48, height: 48, borderRadius: 12, backgroundColor: 'var(--color-accent)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px var(--color-accent-glow)' }}
-          >
-            {showIngest
-              ? <svg style={{ width: 18, height: 18 }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-              : <svg style={{ width: 18, height: 18 }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-            }
-          </button>
-
-          {showIngest && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', justifyContent: 'flex-end', backgroundColor: 'rgba(8,8,9,0.7)' }} onClick={e => { if (e.target === e.currentTarget) setShowIngest(false); }}>
-              <div style={{ width: '100%', maxWidth: 420, height: '100%', padding: 24, overflowY: 'auto', backgroundColor: 'var(--color-surface-1)', borderLeft: '1px solid var(--color-border-subtle)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>Feed Knowledge</h3>
-                  <button onClick={() => setShowIngest(false)} style={{ padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: 'var(--color-text-muted)' }}>
-                    <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-                <IngestPanel agent={agent} />
-              </div>
+      {/* Ingest slide-over */}
+      {viewMode === 'manage' && showIngest && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', justifyContent: 'flex-end', backgroundColor: 'rgba(8,8,9,0.7)' }} onClick={e => { if (e.target === e.currentTarget) setShowIngest(false); }}>
+          <div style={{ width: '100%', maxWidth: 420, height: '100%', padding: 24, overflowY: 'auto', backgroundColor: 'var(--color-surface-1)', borderLeft: '1px solid var(--color-border-subtle)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>Feed Knowledge</h3>
+              <button onClick={() => setShowIngest(false)} style={{ padding: 6, borderRadius: 6, border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: 'var(--color-text-muted)' }}>
+                <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
-          )}
-
-        </>
+            <IngestPanel agent={agent} />
+          </div>
+        </div>
       )}
     </div>
   );
