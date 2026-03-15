@@ -86,7 +86,10 @@ KNOWN SOURCES ALREADY MONITORED:
 TASK: You are an autonomous researcher. Using Google Search, conduct a focused research \
 session on the topics defined in your soul. Goals:
 1. Find new insights, recent developments, counter-evidence, or updates to existing knowledge
-2. Identify up to 5 genuinely new sources worth monitoring regularly (only if found)
+2. Identify up to 5 new sources worth monitoring (only if found). For each, indicate whether
+   it is a RECURRING feed (channel, blog, subreddit, newsletter — produces new content over time)
+   or a ONE-TIME reference (single article, document, GitHub repo, model page, etc.).
+   Exclude auth-required or paywalled pages.
 
 After your research, output ONLY the delimited blocks below. No other text.
 Cap findings at 10 blocks maximum.
@@ -110,6 +113,7 @@ For each new source worth monitoring:
 URL: <full url>
 TYPE: <youtube_channel|blog|website|podcast>
 HANDLE: <@handle or NONE>
+RECURRING: <yes|no>
 RATIONALE: <one sentence>
 ---SOURCE_END---
 """
@@ -585,12 +589,14 @@ class GeminiProvider:
             try:
                 data = self._parse_key_value_block(block)
                 handle = data.get("HANDLE", "NONE")
+                recurring_raw = data.get("RECURRING", "no").strip().lower()
                 sources.append(DiscoveredSource(
                     url=data.get("URL", ""),
                     source_type=data.get("TYPE", "website"),
                     handle=handle if handle != "NONE" else None,
                     rationale=data.get("RATIONALE", ""),
                     discovered_at=datetime.now(timezone.utc).isoformat(),
+                    is_recurring=recurring_raw == "yes",
                 ))
             except Exception as e:
                 logger.warning(f"Skipping malformed SOURCE block: {e}")

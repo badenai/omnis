@@ -11,6 +11,7 @@ interface InboxItem {
   suggestedTarget: string;
   insights: string[];
   summary: string;
+  sources: string[];
   raw: string;
 }
 
@@ -42,7 +43,10 @@ function parseInboxItem(raw: string): InboxItem {
   const summaryMatch = raw.match(/###\s+Summary\n([\s\S]*?)(?=###|$)/);
   const summary = summaryMatch?.[1]?.trim() ?? '';
 
-  return { timestamp, channel, videoId, title, relevanceScore, suggestedAction, suggestedTarget, insights, summary, raw };
+  const sourcesMatch = raw.match(/\*\*Sources:\*\*\s*(.+)/);
+  const sources = sourcesMatch ? sourcesMatch[1].split(',').map((s) => s.trim()) : [];
+
+  return { timestamp, channel, videoId, title, relevanceScore, suggestedAction, suggestedTarget, insights, summary, sources, raw };
 }
 
 function scoreColor(score: number): string {
@@ -132,6 +136,31 @@ function InboxCard({ item }: CardProps) {
           </span>
         )}
       </div>
+
+      {/* Source hostname pills */}
+      {item.sources.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {item.sources.map((url) => {
+            let hostname = url;
+            try { hostname = new URL(url).hostname; } catch { /* keep raw */ }
+            return (
+              <span
+                key={url}
+                style={{
+                  fontSize: 9,
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--color-text-muted)',
+                  backgroundColor: 'var(--color-surface-3)',
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                }}
+              >
+                {hostname}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Expandable: insights + summary */}
       <button

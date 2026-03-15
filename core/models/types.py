@@ -53,6 +53,7 @@ class DiscoveredSource:
     handle: str | None
     rationale: str
     discovered_at: str           # ISO timestamp
+    is_recurring: bool = False   # conservative default — must be explicit yes from AI
 
 
 @dataclass

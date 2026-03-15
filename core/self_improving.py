@@ -1,6 +1,8 @@
+import ipaddress
 import pathlib
 import logging
 import re
+import urllib.parse
 from datetime import datetime, timezone
 
 from core.inbox import InboxWriter
@@ -24,6 +26,45 @@ def _compute_source_id(s: "DiscoveredSource") -> str:
     if s.source_type == "website" and s.url:
         return s.url
     return s.handle or s.url or ""
+
+
+_AUTH_PATH_PREFIXES = (
+    "/login", "/signin", "/sign-in", "/auth",
+    "/subscribe", "/paywall", "/register", "/account/login",
+)
+
+
+def _check_source_safety(s: "DiscoveredSource") -> tuple[bool, str]:
+    """Returns (is_safe, rejection_reason). Empty reason means safe."""
+    try:
+        parsed = urllib.parse.urlparse(s.url)
+        if parsed.scheme not in ("http", "https"):
+            return False, f"Unsupported scheme: {parsed.scheme!r}"
+        hostname = parsed.hostname or ""
+        if not hostname or hostname in ("localhost",) or hostname.endswith(".local"):
+            return False, "Private/reserved hostname"
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local:
+                return False, "Private/reserved IP"
+        except ValueError:
+            pass
+    except Exception as e:
+        return False, f"Invalid URL: {e}"
+
+    try:
+        import httpx
+        resp = httpx.head(s.url, follow_redirects=True, timeout=10,
+                          headers={"User-Agent": "OmnisBot/1.0"})
+        if resp.status_code in (401, 402, 403):
+            return False, f"HTTP {resp.status_code}"
+        final_path = urllib.parse.urlparse(str(resp.url)).path.lower()
+        if any(final_path.startswith(p) for p in _AUTH_PATH_PREFIXES):
+            return False, "Redirected to auth/paywall path"
+    except Exception as e:
+        logger.warning(f"HEAD check failed for {s.url}: {e} — allowing")
+
+    return True, ""
 
 
 class SelfImprovingSession:
@@ -62,9 +103,26 @@ class SelfImprovingSession:
                     self._append_finding_to_inbox(inbox, finding)
 
             if new_sources:
-                job_status.update_step(agent_id, task, f"Logging {len(new_sources)} discovered sources...")
-                self._log_discovered_sources(new_sources)
-                self._auto_add_sources(new_sources)
+                job_status.update_step(agent_id, task, f"Validating {len(new_sources)} discovered sources...")
+                accepted: list[DiscoveredSource] = []
+                one_time: list[DiscoveredSource] = []
+                rejected: list[tuple[DiscoveredSource, str]] = []
+                for s in new_sources:
+                    is_safe, reason = _check_source_safety(s)
+                    if not is_safe:
+                        rejected.append((s, reason))
+                    elif s.is_recurring:
+                        accepted.append(s)
+                    else:
+                        one_time.append(s)
+                logger.info(
+                    f"[{agent_id}] Sources: {len(accepted)} recurring, "
+                    f"{len(one_time)} one-time, {len(rejected)} rejected"
+                )
+                self._log_discovered_sources(accepted, one_time, rejected)
+                self._auto_add_sources(accepted)
+                for s in one_time:
+                    self._ingest_once(s)
 
             logger.info(
                 f"[{agent_id}] Self-improving session complete: "
@@ -99,19 +157,59 @@ class SelfImprovingSession:
             suggested_target=finding.suggested_target,
             raw_summary=finding.raw_summary,
         )
-        inbox.append("self-improving", result)
+        inbox.append("self-improving", result, sources=finding.sources_consulted)
 
-    def _log_discovered_sources(self, sources: list[DiscoveredSource]) -> None:
+    def _ingest_once(self, s: DiscoveredSource) -> None:
+        """Fetch a non-recurring source once and add its insights to inbox."""
+        import httpx
+        from markdownify import markdownify
+        try:
+            resp = httpx.get(s.url, follow_redirects=True, timeout=20,
+                             headers={"User-Agent": "OmnisBot/1.0"})
+            resp.raise_for_status()
+            m = re.search(r'<title[^>]*>(.*?)</title>', resp.text, re.I | re.S)
+            title = m.group(1).strip() if m else s.url
+            content = markdownify(resp.text, strip=["script", "style", "nav", "footer"])[:12000]
+            result = self._provider.analyze_web_content(s.url, content, title, self._soul)
+            InboxWriter(self._dir).append(s.url, result, sources=[s.url])
+            logger.info(f"[{self._config.agent_id}] One-time ingested: {s.url}")
+        except Exception as e:
+            logger.warning(f"One-time ingest failed for {s.url}: {e}")
+
+    def _log_discovered_sources(
+        self,
+        accepted: list[DiscoveredSource],
+        one_time: list[DiscoveredSource],
+        rejected: list[tuple[DiscoveredSource, str]],
+    ) -> None:
         dest = self._dir / _DISCOVERED_SOURCES_FILE
         existing = dest.read_text(encoding="utf-8") if dest.exists() else "# Discovered Sources\n\n"
         new_entries = []
-        for s in sources:
+        for s in accepted:
             new_entries.append(
                 f"## {s.discovered_at}\n"
-                f"- **URL:** {s.url}\n"
-                f"- **Type:** {s.source_type}\n"
+                f"- **URL:** {s.url}\n- **Type:** {s.source_type}\n"
                 f"- **Handle:** {s.handle or 'N/A'}\n"
                 f"- **Source ID:** {_compute_source_id(s)}\n"
+                f"- **Status:** accepted\n"
+                f"- **Rationale:** {s.rationale}\n"
+            )
+        for s in one_time:
+            new_entries.append(
+                f"## {s.discovered_at}\n"
+                f"- **URL:** {s.url}\n- **Type:** {s.source_type}\n"
+                f"- **Handle:** {s.handle or 'N/A'}\n"
+                f"- **Source ID:** {_compute_source_id(s)}\n"
+                f"- **Status:** one-time\n"
+                f"- **Rationale:** {s.rationale}\n"
+            )
+        for s, reason in rejected:
+            new_entries.append(
+                f"## {s.discovered_at}\n"
+                f"- **URL:** {s.url}\n- **Type:** {s.source_type}\n"
+                f"- **Handle:** {s.handle or 'N/A'}\n"
+                f"- **Source ID:** {_compute_source_id(s)}\n"
+                f"- **Status:** rejected — {reason}\n"
                 f"- **Rationale:** {s.rationale}\n"
             )
         dest.write_text(existing + "\n".join(new_entries), encoding="utf-8")
