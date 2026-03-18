@@ -340,8 +340,11 @@ class GeminiProvider:
             f"1. Does it update an existing concept? (action: update_concept, target: filename)\n"
             f"2. Is it a genuinely new concept? (action: new_concept, target: filename-hint)\n"
             f"3. Is it time-sensitive news? (action: new_recent, target: filename-hint)\n\n"
+            f"Also assign a relevance_score (0.0–1.0) reflecting how well this item aligns with the soul. "
+            f"Be discriminating: reserve 0.9+ for directly core insights, use 0.5–0.8 for useful-but-peripheral content, "
+            f"and 0.1–0.4 for weakly relevant material.\n\n"
             f"Respond with JSON only:\n"
-            f'{{"decisions": [{{"inbox_index": 0, "action": "update_concept", "target": "support-resistance"}}, ...]}}'
+            f'{{"decisions": [{{"inbox_index": 0, "action": "update_concept", "target": "support-resistance", "relevance_score": 0.85}}, ...]}}'
         )
         raw = self._generate(contents, model=self._consolidation_model_name)
         text = raw.strip()
@@ -353,11 +356,12 @@ class GeminiProvider:
             action = d.get("action", "")
             target = d.get("target", "")
             idx = d.get("inbox_index", 0)
+            score = float(d.get("relevance_score", 1.0))
             if action == "update_concept":
                 updated.append(target)
             elif action in ("new_concept", "new_recent"):
                 created.append(target)
-            decisions.append(ConsolidationDecision(inbox_index=idx, action=action, target=target))
+            decisions.append(ConsolidationDecision(inbox_index=idx, action=action, target=target, relevance_score=score))
         return ConsolidationResult(updated_files=updated, created_files=created, decisions=decisions)
 
     def screen_videos(self, videos: list[dict], soul: str) -> list[str]:
@@ -782,7 +786,7 @@ class GeminiProvider:
         )
 
         text_buf: list[str] = []
-        function_calls: list = []
+        function_call_parts: list = []  # full Part objects — preserves thought_signature
 
         for chunk in stream:
             if not chunk.candidates:
@@ -792,39 +796,41 @@ class GeminiProvider:
                 continue
             for part in content.parts or []:
                 if part.function_call:
-                    function_calls.append(part.function_call)
+                    function_call_parts.append(part)
                 elif part.text:
                     yield part.text
                     text_buf.append(part.text)
 
-        if not function_calls:
+        if not function_call_parts:
             return  # Pure streaming path — zero extra latency
 
         # Add model response (text + function calls) to conversation history
         model_parts: list = []
         if text_buf:
             model_parts.append(gtypes.Part(text="".join(text_buf)))
-        for fc in function_calls:
-            model_parts.append(gtypes.Part(function_call=fc))
+        model_parts.extend(function_call_parts)  # preserve full parts incl. thought_signature
         contents.append(gtypes.Content(role="model", parts=model_parts))
 
         # --- Agentic turns ---
         for turn in range(_MAX_AGENTIC_TURNS):
-            # Execute tool calls
+            # Execute tool calls — echo thought_signature back for thinking models
             response_parts: list = []
-            for fc in function_calls:
+            for part in function_call_parts:
+                fc = part.function_call
                 handler = tool_handlers.get(fc.name)
                 try:
                     result = handler(**dict(fc.args)) if handler else f"Error: unknown tool {fc.name}"
                 except Exception as e:
                     result = f"Error executing {fc.name}: {e}"
-                response_parts.append(
-                    gtypes.Part(
-                        function_response=gtypes.FunctionResponse(
-                            name=fc.name, response={"result": result}
-                        )
+                sig = getattr(part, "thought_signature", None)
+                resp_kwargs: dict = {
+                    "function_response": gtypes.FunctionResponse(
+                        name=fc.name, response={"result": result}
                     )
-                )
+                }
+                if sig:
+                    resp_kwargs["thought_signature"] = sig
+                response_parts.append(gtypes.Part(**resp_kwargs))
             contents.append(gtypes.Content(role="user", parts=response_parts))
 
             if turn == _MAX_AGENTIC_TURNS - 1:
@@ -849,12 +855,12 @@ class GeminiProvider:
                 return
 
             model_parts = list(resp.candidates[0].content.parts or [])
-            function_calls = [p.function_call for p in model_parts if p.function_call]
+            function_call_parts = [p for p in model_parts if p.function_call]
             text_parts = [p.text for p in model_parts if p.text]
 
             contents.append(gtypes.Content(role="model", parts=model_parts))
 
-            if not function_calls:
+            if not function_call_parts:
                 # Final answer — yield the text and return
                 for t in text_parts:
                     yield t

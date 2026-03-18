@@ -569,9 +569,11 @@ export default function AgentDetail() {
             </button>
           </div>
 
-          {/* ChatPanel fills full height; its own paddingTop clears the floating header */}
-          <div style={{ height: '100%', position: 'relative', zIndex: 1 }}>
-            <ChatPanel agentId={agent.agent_id} soul={agent.soul} />
+          {/* ChatPanel — centered column, clears floating header via its own paddingTop */}
+          <div style={{ height: '100%', position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '100%', maxWidth: 820 }}>
+              <ChatPanel agentId={agent.agent_id} soul={agent.soul} />
+            </div>
           </div>
         </div>
       )}

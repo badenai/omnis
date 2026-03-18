@@ -14,15 +14,16 @@ class KnowledgeWriter:
         decay = math.exp(-math.log(2) * age_days / self._half_life)
         return round(relevance_score * decay, 4)
 
-    def write_concept(self, name: str, content: str, tags: list[str] | None = None) -> pathlib.Path:
+    def write_concept(self, name: str, content: str, tags: list[str] | None = None, relevance_score: float = 1.0) -> pathlib.Path:
+        name = name.removesuffix(".md")
         dest = self._base / "concepts" / f"{name}.md"
         dest.parent.mkdir(parents=True, exist_ok=True)
         now = datetime.now(timezone.utc).date().isoformat()
         metadata = {
             "created": now,
             "updated": now,
-            "relevance_score": 1.0,
-            "effective_weight": 1.0,
+            "relevance_score": relevance_score,
+            "effective_weight": relevance_score,
             "decay_half_life": self._half_life,
             "sources": [],
             "tags": tags or [],
@@ -31,21 +32,28 @@ class KnowledgeWriter:
         dest.write_text(frontmatter.dumps(post), encoding="utf-8")
         return dest
 
-    def update_concept(self, name: str, new_content: str, source_id: str) -> pathlib.Path:
+    def update_concept(self, name: str, new_content: str, source_id: str, relevance_score: float | None = None) -> pathlib.Path:
+        name = name.removesuffix(".md")
         dest = self._base / "concepts" / f"{name}.md"
         if dest.exists():
             post = frontmatter.load(str(dest))
             post.content = new_content
             post["updated"] = datetime.now(timezone.utc).date().isoformat()
+            if relevance_score is not None:
+                # nudge score toward the new value — reinforce if higher, soften if lower
+                old_score = float(post.get("relevance_score", 1.0))
+                post["relevance_score"] = round(max(old_score, relevance_score) * 0.7 + relevance_score * 0.3, 4)
             if source_id not in post.get("sources", []):
                 post["sources"] = post.get("sources", []) + [source_id]
         else:
-            post = frontmatter.Post(new_content, sources=[source_id])
+            post = frontmatter.Post(new_content, sources=[source_id],
+                                    relevance_score=relevance_score if relevance_score is not None else 1.0)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(frontmatter.dumps(post), encoding="utf-8")
         return dest
 
-    def write_recent(self, name: str, content: str, source_id: str) -> pathlib.Path:
+    def write_recent(self, name: str, content: str, source_id: str, relevance_score: float = 1.0) -> pathlib.Path:
+        name = name.removesuffix(".md")
         month = datetime.now(timezone.utc).strftime("%Y-%m")
         dest = self._base / "recent" / month / f"{name}.md"
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -53,7 +61,7 @@ class KnowledgeWriter:
         metadata = {
             "created": now,
             "updated": now,
-            "relevance_score": 1.0,
+            "relevance_score": relevance_score,
             "decay_half_life": self._half_life,
             "sources": [source_id],
             "tags": [],

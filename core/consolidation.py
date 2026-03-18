@@ -49,15 +49,16 @@ class ConsolidationPipeline:
                 if decision.inbox_index >= len(items):
                     continue
                 content = items[decision.inbox_index]
+                score = decision.relevance_score
                 if decision.action == "update_concept":
-                    kw.update_concept(decision.target, content, source_id="inbox")
-                    job_status.log(agent_id, task, f"update_concept: {decision.target}")
+                    kw.update_concept(decision.target, content, source_id="inbox", relevance_score=score)
+                    job_status.log(agent_id, task, f"update_concept: {decision.target} (score={score:.2f})")
                 elif decision.action == "new_concept":
-                    kw.write_concept(decision.target, content)
-                    job_status.log(agent_id, task, f"new_concept: {decision.target}")
+                    kw.write_concept(decision.target, content, relevance_score=score)
+                    job_status.log(agent_id, task, f"new_concept: {decision.target} (score={score:.2f})")
                 elif decision.action == "new_recent":
-                    kw.write_recent(decision.target, content, source_id="inbox")
-                    job_status.log(agent_id, task, f"new_recent: {decision.target}")
+                    kw.write_recent(decision.target, content, source_id="inbox", relevance_score=score)
+                    job_status.log(agent_id, task, f"new_recent: {decision.target} (score={score:.2f})")
 
             knowledge_files = kw.load_all_weighted()
 

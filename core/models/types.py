@@ -25,6 +25,7 @@ class ConsolidationDecision:
     inbox_index: int
     action: str   # "update_concept" | "new_concept" | "new_recent"
     target: str   # filename hint (no extension)
+    relevance_score: float = 1.0
 
 
 @dataclass
