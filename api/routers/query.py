@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from core.agent_tools import build_tools
 from core.query import QueryHandler
 
 logger = logging.getLogger(__name__)
@@ -27,13 +28,15 @@ async def query_agent(agent_id: str, body: QueryRequest, request: Request):
     provider = agent["provider"]
 
     qh = QueryHandler(agent_dir=agent["dir"], soul=soul)
-    tier = qh.select_tier(body.message)
-    context, sources = qh.build_context(tier=tier)
+    context, sources = qh.build_context()
     system_prompt = qh.build_system_prompt(context)
+    tool_decls, tool_handlers = build_tools(agent["dir"])
 
     def event_stream():
         try:
-            for token in provider.stream_query(system_prompt, body.message, body.history):
+            for token in provider.stream_query(
+                system_prompt, body.message, body.history, tool_decls, tool_handlers
+            ):
                 yield f"data: {json.dumps({'token': token})}\n\n"
             yield f"data: {json.dumps({'sources': sources})}\n\n"
             yield "data: [DONE]\n\n"

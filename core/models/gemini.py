@@ -749,9 +749,18 @@ class GeminiProvider:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
-    def stream_query(self, system_prompt: str, message: str, history: list[dict]):
-        """Yields string tokens from a streaming Gemini chat."""
+    def stream_query(
+        self,
+        system_prompt: str,
+        message: str,
+        history: list[dict],
+        tool_declarations: list,
+        tool_handlers: dict,
+    ):
+        """Yields string tokens from a streaming Gemini chat with an agentic tool loop."""
         from google.genai import types as gtypes
+
+        _MAX_AGENTIC_TURNS = 5
 
         contents = []
         for h in history:
@@ -759,11 +768,95 @@ class GeminiProvider:
             contents.append(gtypes.Content(role=role, parts=[gtypes.Part(text=h["content"])]))
         contents.append(gtypes.Content(role="user", parts=[gtypes.Part(text=message)]))
 
-        response = self._client.models.generate_content_stream(
+        tools_cfg = gtypes.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[gtypes.Tool(function_declarations=tool_declarations)] if tool_declarations else None,
+        )
+        no_tools_cfg = gtypes.GenerateContentConfig(system_instruction=system_prompt)
+
+        # --- Turn 0: streaming ---
+        stream = self._client.models.generate_content_stream(
             model=self._consolidation_model_name,
             contents=contents,
-            config=gtypes.GenerateContentConfig(system_instruction=system_prompt),
+            config=tools_cfg if tool_declarations else no_tools_cfg,
         )
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+
+        text_buf: list[str] = []
+        function_calls: list = []
+
+        for chunk in stream:
+            if not chunk.candidates:
+                continue
+            content = chunk.candidates[0].content
+            if not content:
+                continue
+            for part in content.parts or []:
+                if part.function_call:
+                    function_calls.append(part.function_call)
+                elif part.text:
+                    yield part.text
+                    text_buf.append(part.text)
+
+        if not function_calls:
+            return  # Pure streaming path — zero extra latency
+
+        # Add model response (text + function calls) to conversation history
+        model_parts: list = []
+        if text_buf:
+            model_parts.append(gtypes.Part(text="".join(text_buf)))
+        for fc in function_calls:
+            model_parts.append(gtypes.Part(function_call=fc))
+        contents.append(gtypes.Content(role="model", parts=model_parts))
+
+        # --- Agentic turns ---
+        for turn in range(_MAX_AGENTIC_TURNS):
+            # Execute tool calls
+            response_parts: list = []
+            for fc in function_calls:
+                handler = tool_handlers.get(fc.name)
+                try:
+                    result = handler(**dict(fc.args)) if handler else f"Error: unknown tool {fc.name}"
+                except Exception as e:
+                    result = f"Error executing {fc.name}: {e}"
+                response_parts.append(
+                    gtypes.Part(
+                        function_response=gtypes.FunctionResponse(
+                            name=fc.name, response={"result": result}
+                        )
+                    )
+                )
+            contents.append(gtypes.Content(role="user", parts=response_parts))
+
+            if turn == _MAX_AGENTIC_TURNS - 1:
+                # Safety cap: final streaming pass with tools disabled
+                final_stream = self._client.models.generate_content_stream(
+                    model=self._consolidation_model_name,
+                    contents=contents,
+                    config=no_tools_cfg,
+                )
+                for chunk in final_stream:
+                    if chunk.text:
+                        yield chunk.text
+                return
+
+            # Non-streaming turn
+            resp = self._client.models.generate_content(
+                model=self._consolidation_model_name,
+                contents=contents,
+                config=tools_cfg,
+            )
+            if not resp.candidates:
+                return
+
+            model_parts = list(resp.candidates[0].content.parts or [])
+            function_calls = [p.function_call for p in model_parts if p.function_call]
+            text_parts = [p.text for p in model_parts if p.text]
+
+            contents.append(gtypes.Content(role="model", parts=model_parts))
+
+            if not function_calls:
+                # Final answer — yield the text and return
+                for t in text_parts:
+                    yield t
+                return
+            # else: loop continues with new function_calls

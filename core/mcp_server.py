@@ -39,11 +39,12 @@ def build_mcp_server(agents: dict) -> FastMCP:
             @mcp.tool(name=f"ask_{aid}", description=tool_description)
             def ask_agent(query: str) -> str:
                 """Ask this knowledge agent a question and get a full response."""
+                from core.agent_tools import build_tools
                 qh = QueryHandler(agent_dir=adir, soul=s)
-                tier = qh.select_tier(query)
-                context, _ = qh.build_context(tier=tier)
+                context, _ = qh.build_context()
                 system_prompt = qh.build_system_prompt(context)
-                tokens = list(p.stream_query(system_prompt, query, []))
+                tool_decls, tool_handlers = build_tools(adir)
+                tokens = list(p.stream_query(system_prompt, query, [], tool_decls, tool_handlers))
                 return "".join(tokens)
             return ask_agent
 

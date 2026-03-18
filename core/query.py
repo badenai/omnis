@@ -1,24 +1,6 @@
 import pathlib
-import re
-from datetime import datetime, timezone, timedelta, date
 
 import frontmatter
-
-_RECENT_KEYWORDS = {"latest", "recent", "trend", "today", "this week", "current", "new", "now", "last"}
-_MAX_RECENT_FILES = 20
-_RECENT_DAYS = 30
-
-
-def _matches_recent(question: str) -> bool:
-    q = question.lower()
-    for kw in _RECENT_KEYWORDS:
-        if " " in kw:
-            if kw in q:
-                return True
-        else:
-            if re.search(rf"\b{re.escape(kw)}", q):
-                return True
-    return False
 
 
 class QueryHandler:
@@ -26,46 +8,15 @@ class QueryHandler:
         self._dir = agent_dir
         self._soul = soul
 
-    def select_tier(self, question: str) -> int:
-        """Return context tier: 1=memory only, 2=memory+recent files."""
-        if _matches_recent(question):
-            return 2
-        return 1
-
-    def build_context(self, tier: int) -> tuple[str, list[str]]:
-        """Returns (context_text, list_of_source_paths)."""
+    def build_context(self) -> tuple[str, list[str]]:
+        """Always loads digest + _index so the model knows what files exist."""
         parts: list[str] = []
         sources: list[str] = []
-
-        memory_path = self._dir / "digest.md"
-
-        if memory_path.exists():
-            parts.append(memory_path.read_text(encoding="utf-8"))
-            sources.append(memory_path.name)
-
-        if tier >= 2:
-            # Add recent knowledge files within the cutoff window
-            recent_dir = self._dir / "knowledge" / "recent"
-            cutoff = datetime.now(timezone.utc).date() - timedelta(days=_RECENT_DAYS)
-            if recent_dir.exists():
-                candidates = sorted(recent_dir.rglob("*.md"), reverse=True)
-                added = 0
-                for md in candidates:
-                    if added >= _MAX_RECENT_FILES:
-                        break
-                    try:
-                        post = frontmatter.load(str(md))
-                        created_str = post.get("created", "")
-                        if created_str:
-                            created = date.fromisoformat(str(created_str))
-                            if created >= cutoff:
-                                rel = str(md.relative_to(self._dir))
-                                parts.append(f"### {md.stem}\n{post.content}")
-                                sources.append(rel)
-                                added += 1
-                    except Exception:
-                        pass
-
+        for name in ("digest.md", "knowledge/_index.md"):
+            path = self._dir / name
+            if path.exists():
+                parts.append(path.read_text(encoding="utf-8"))
+                sources.append(name)
         return "\n\n".join(parts), sources
 
     def build_system_prompt(self, context: str) -> str:

@@ -28,7 +28,8 @@ def make_source(handle="@NewChannel"):
     return DiscoveredSource(
         url=f"https://youtube.com/{handle}", source_type="youtube_channel",
         handle=handle, rationale="Great content",
-        discovered_at=datetime.now(timezone.utc).isoformat())
+        discovered_at=datetime.now(timezone.utc).isoformat(),
+        is_recurring=True)
 
 
 def test_self_improving_writes_finding_to_inbox(tmp_path):
@@ -122,7 +123,7 @@ def test_auto_add_sources_normalizes_handle_without_at(tmp_path):
     bare_source = DiscoveredSource(
         url="https://youtube.com/SomeChannel", source_type="youtube_channel",
         handle="SomeChannel", rationale="Good channel",
-        discovered_at="2026-01-01T00:00:00+00:00")
+        discovered_at="2026-01-01T00:00:00+00:00", is_recurring=True)
     provider = MagicMock()
     provider.research_domain.return_value = ([make_finding()], [bare_source])
 
@@ -214,7 +215,7 @@ def test_auto_add_sources_adds_blog_as_web_page(tmp_path):
     blog_source = DiscoveredSource(
         url="https://example.com/blog", source_type="blog",
         handle=None, rationale="Good blog",
-        discovered_at=datetime.now(timezone.utc).isoformat())
+        discovered_at=datetime.now(timezone.utc).isoformat(), is_recurring=True)
     provider = MagicMock()
     provider.research_domain.return_value = ([make_finding()], [blog_source])
 

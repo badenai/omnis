@@ -465,7 +465,7 @@ export default function AgentDetail() {
   const handleResetSource = (sourceId: string) => act(() => resetSourceStatus.mutateAsync(sourceId), `Reactivated ${sourceId}.`);
 
   const handleAddSource = async () => {
-    let entry: Record<string, unknown> = { type: newSourceType };
+    const entry: { type: string; [key: string]: unknown } = { type: newSourceType };
     if (newSourceType === 'youtube' || newSourceType === 'medium') {
       if (!newHandle.trim()) return;
       entry.handle = newHandle.trim();
@@ -998,7 +998,7 @@ export default function AgentDetail() {
                                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{displayLabel}</span>
                                   <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{src.type.replace('_', ' ')}</span>
                                   <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: statusColor, backgroundColor: statusBg, padding: '1px 7px', borderRadius: 99, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.07em' }}>{status}</span>
-                                  {src.type === 'reddit' && src.min_score && (
+                                  {src.type === 'reddit' && Boolean(src.min_score) && (
                                     <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', backgroundColor: 'var(--color-surface-3)', padding: '1px 6px', borderRadius: 4 }}>≥{String(src.min_score)} pts</span>
                                   )}
                                   {isDiscovered && (

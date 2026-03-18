@@ -28,7 +28,12 @@ class KnowledgeProvider(Protocol):
     def integrate_soul_suggestions(self, soul: str, suggestions: list[str]) -> str: ...
 
     def stream_query(
-        self, system_prompt: str, message: str, history: list[dict]
+        self,
+        system_prompt: str,
+        message: str,
+        history: list[dict],
+        tool_declarations: list,
+        tool_handlers: dict,
     ):
         """Yields string tokens. history items: {"role": "user"|"model", "content": str}"""
         ...

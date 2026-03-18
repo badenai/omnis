@@ -58,7 +58,7 @@ async def stream_soul_assistant(body: SoulAssistantRequest, request: Request):
 
     def event_stream():
         try:
-            for token in provider.stream_query(system_prompt, body.message, body.history):
+            for token in provider.stream_query(system_prompt, body.message, body.history, [], {}):
                 yield f"data: {json.dumps({'token': token})}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
