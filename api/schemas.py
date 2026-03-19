@@ -44,6 +44,7 @@ class AgentConfigUpdate(BaseModel):
     consolidation_model: str | None = None
     self_improving: bool | None = None
     skill_eval: SkillEvalConfig | None = None
+    paused: bool | None = None
 
 
 class SoulUpdate(BaseModel):
@@ -62,6 +63,7 @@ class AgentSummary(BaseModel):
     self_improving: bool = True
     latest_quality_score: float | None = None
     quality_alert: bool = False
+    paused: bool = False
 
 
 class SourceStats(BaseModel):
@@ -92,6 +94,7 @@ class AgentDetail(BaseModel):
     latest_quality_score: float | None = None
     quality_alert: bool = False
     has_soul_backup: bool = False
+    paused: bool = False
 
 
 class SoulIntegrateRequest(BaseModel):

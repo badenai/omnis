@@ -58,6 +58,7 @@ export interface AgentSummary {
   self_improving: boolean;
   latest_quality_score: number | null;
   quality_alert: boolean;
+  paused: boolean;
 }
 
 export interface SourceStats {
@@ -88,6 +89,7 @@ export interface AgentDetail {
   latest_quality_score: number | null;
   quality_alert: boolean;
   has_soul_backup: boolean;
+  paused: boolean;
 }
 
 export interface AgentConfigCreate {

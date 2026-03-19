@@ -110,6 +110,30 @@ export function useUpdateSoul(id: string) {
   });
 }
 
+export function usePauseAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<AgentDetail>(`/agents/${id}/pause`, { method: 'POST' }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['agents'] });
+      qc.invalidateQueries({ queryKey: ['agents', id] });
+    },
+  });
+}
+
+export function useResumeAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<AgentDetail>(`/agents/${id}/resume`, { method: 'POST' }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['agents'] });
+      qc.invalidateQueries({ queryKey: ['agents', id] });
+    },
+  });
+}
+
 export function useDeleteAgent() {
   const qc = useQueryClient();
   return useMutation({

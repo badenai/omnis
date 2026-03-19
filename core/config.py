@@ -17,6 +17,7 @@ def load_agent_config(config_path: pathlib.Path) -> AgentConfig:
         consolidation_model=data.get("consolidation_model", "gemini-3.1-pro-preview"),
         self_improving=data.get("self_improving", True),
         skill_eval=_parse_skill_eval_config(data.get("skill_eval", {})),
+        paused=data.get("paused", False),
     )
 
 

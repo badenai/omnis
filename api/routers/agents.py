@@ -64,6 +64,7 @@ def _agent_summary(agent: dict) -> AgentSummary:
         self_improving=config.self_improving,
         latest_quality_score=latest_score,
         quality_alert=quality_alert,
+        paused=config.paused,
     )
 
 
@@ -108,6 +109,7 @@ def _agent_detail(agent: dict) -> AgentDetail:
         latest_quality_score=latest_score,
         quality_alert=quality_alert,
         has_soul_backup=(agent_dir / "soul_backup.md").exists(),
+        paused=config.paused,
     )
 
 
@@ -165,6 +167,7 @@ def create_agent(body: AgentConfigCreate, request: Request):
         "consolidation_model": body.consolidation_model,
         "self_improving": body.self_improving,
         "skill_eval": body.skill_eval.model_dump(),
+        "paused": False,
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
     save_soul(agent_dir, body.soul)
@@ -213,6 +216,7 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
                 "enabled": config.skill_eval.enabled,
             }
         ),
+        "paused": body.paused if body.paused is not None else config.paused,
     }
     save_agent_config(agent_dir / "config.yaml", config_data)
 
@@ -253,6 +257,49 @@ def integrate_soul(agent_id: str, body: SoulIntegrateRequest, request: Request):
     agent = agents[agent_id]
     integrated = agent["provider"].integrate_soul_suggestions(body.soul, body.suggestions)
     return {"integrated_soul": integrated}
+
+
+def _set_agent_paused(agent_id: str, paused: bool, agents: dict) -> AgentDetail:
+    """Write paused flag to config.yaml and reschedule (removes jobs if paused)."""
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent = agents[agent_id]
+    agent_dir = agent["dir"]
+    config = agent["config"]
+    config_data = {
+        "agent_id": config.agent_id,
+        "model": config.model,
+        "analysis_mode": config.analysis_mode,
+        "sources": config.sources,
+        "consolidation_schedule": config.consolidation_schedule,
+        "decay": config.decay,
+        "collection_model": config.collection_model,
+        "consolidation_model": config.consolidation_model,
+        "self_improving": config.self_improving,
+        "skill_eval": {
+            "prompts": config.skill_eval.prompts,
+            "min_quality_threshold": config.skill_eval.min_quality_threshold,
+            "enabled": config.skill_eval.enabled,
+        },
+        "paused": paused,
+    }
+    save_agent_config(agent_dir / "config.yaml", config_data)
+    gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+    new_agent = load_agent(agent_dir, gemini_api_key=gemini_api_key)
+    agents[agent_id] = new_agent
+    _reschedule_agent(new_agent)
+    logger.info(f"Agent '{agent_id}' {'paused' if paused else 'resumed'}")
+    return _agent_detail(new_agent)
+
+
+@router.post("/{agent_id}/pause", response_model=AgentDetail)
+def pause_agent(agent_id: str, request: Request):
+    return _set_agent_paused(agent_id, True, _get_agents(request))
+
+
+@router.post("/{agent_id}/resume", response_model=AgentDetail)
+def resume_agent(agent_id: str, request: Request):
+    return _set_agent_paused(agent_id, False, _get_agents(request))
 
 
 @router.post("/{agent_id}/soul/preview-eval")

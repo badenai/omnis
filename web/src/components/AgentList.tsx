@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { useAgents } from '../api/agents';
+import { useAgents, usePauseAgent, useResumeAgent } from '../api/agents';
 import { useActivity } from '../api/scheduler';
 
-type AgentStatus = 'running' | 'attention' | 'quality-alert' | 'ok' | 'idle';
+type AgentStatus = 'running' | 'attention' | 'quality-alert' | 'ok' | 'idle' | 'paused';
 
 function agentStatus(
   agentId: string,
@@ -10,7 +10,9 @@ function agentStatus(
   lastConsolidation: string | null | undefined,
   activeAgentIds: Set<string>,
   qualityAlert: boolean,
+  paused: boolean,
 ): AgentStatus {
+  if (paused) return 'paused';
   if (activeAgentIds.has(agentId)) return 'running';
   if (inboxCount > 0) return 'attention';
   if (qualityAlert) return 'quality-alert';
@@ -24,6 +26,7 @@ const statusConfig: Record<AgentStatus, { color: string; label: string }> = {
   'quality-alert': { color: 'var(--color-status-error)', label: 'Quality Alert' },
   ok: { color: 'var(--color-status-ok)', label: 'OK' },
   idle: { color: 'var(--color-status-idle)', label: 'Idle' },
+  paused: { color: 'var(--color-text-muted)', label: 'Paused' },
 };
 
 function StatCard({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
@@ -51,6 +54,8 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
 export default function AgentList() {
   const { data: agents, isLoading, error } = useAgents();
   const { data: activityData } = useActivity();
+  const pauseAgent = usePauseAgent();
+  const resumeAgent = useResumeAgent();
 
   const activeAgentIds = new Set(
     (activityData?.active ?? []).map((j) => j.agent_id)
@@ -161,7 +166,8 @@ export default function AgentList() {
         /* Agent grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agentList.map((a) => {
-            const status = agentStatus(a.agent_id, a.inbox_count, a.last_consolidation, activeAgentIds, a.quality_alert);
+            const isPending = pauseAgent.isPending || resumeAgent.isPending;
+            const status = agentStatus(a.agent_id, a.inbox_count, a.last_consolidation, activeAgentIds, a.quality_alert, a.paused ?? false);
             const sc = statusConfig[status];
             return (
               <Link
@@ -171,6 +177,7 @@ export default function AgentList() {
                 style={{
                   backgroundColor: 'var(--color-surface-1)',
                   border: '1px solid var(--color-border-subtle)',
+                  opacity: a.paused ? 0.7 : 1,
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-subtle)')}
@@ -203,15 +210,51 @@ export default function AgentList() {
                     </div>
                   </div>
 
-                  {/* Status indicator */}
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${status === 'running' ? 'animate-pulse' : ''}`}
-                      style={{ backgroundColor: sc.color }}
-                    />
-                    <span className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: sc.color }}>
-                      {sc.label}
-                    </span>
+                  {/* Status indicator + pause/resume button */}
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${status === 'running' ? 'animate-pulse' : ''}`}
+                        style={{ backgroundColor: sc.color }}
+                      />
+                      <span className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: sc.color }}>
+                        {sc.label}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (a.paused) {
+                          resumeAgent.mutate(a.agent_id);
+                        } else {
+                          pauseAgent.mutate(a.agent_id);
+                        }
+                      }}
+                      disabled={isPending}
+                      title={a.paused ? 'Resume scheduled runs' : 'Pause scheduled runs'}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 22, height: 22, borderRadius: 4, flexShrink: 0,
+                        border: '1px solid var(--color-border-subtle)',
+                        backgroundColor: 'var(--color-surface-3)',
+                        color: 'var(--color-text-muted)',
+                        cursor: isPending ? 'default' : 'pointer',
+                        opacity: isPending ? 0.5 : 1,
+                      }}
+                    >
+                      {a.paused ? (
+                        /* play icon */
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      ) : (
+                        /* pause icon */
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
 

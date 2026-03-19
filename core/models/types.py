@@ -100,3 +100,4 @@ class AgentConfig:
     consolidation_model: str = "gemini-3.1-pro-preview"
     self_improving: bool = True
     skill_eval: SkillEvalConfig = field(default_factory=SkillEvalConfig)
+    paused: bool = False

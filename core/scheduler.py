@@ -22,6 +22,9 @@ def build_scheduler(agents: list[dict], scheduler: BackgroundScheduler | None = 
 
     for agent in agents:
         config = agent["config"]
+        if config.paused:
+            logger.info(f"Skipping scheduler for paused agent: {config.agent_id}")
+            continue
         collection_pipeline = agent["collection"]
         consolidation_pipeline = agent["consolidation"]
         self_improving_session = agent.get("self_improving")
