@@ -99,6 +99,10 @@ class SoulIntegrateRequest(BaseModel):
     suggestions: list[str]
 
 
+class SoulPreviewEvalRequest(BaseModel):
+    soul: str
+
+
 class IngestUrlRequest(BaseModel):
     url: str
     title: str | None = None

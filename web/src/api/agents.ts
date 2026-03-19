@@ -2,6 +2,47 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { AgentSummary, AgentDetail, AgentConfigCreate, AgentConfigUpdate } from '../types';
 
+export interface SkillQualityEntry {
+  score: number;
+  skill_version: string;
+  timestamp: string;
+  rollback?: boolean;
+  eval_results: PromptEvalResult[];
+}
+
+export interface PromptEvalResult {
+  prompt: string;
+  with_skill_score: number;
+  without_skill_score: number;
+  delta: number;
+  grader_reasoning: string;
+}
+
+export interface SoulPreviewEvalResult {
+  score_before: number | null;
+  score_after: number;
+  delta: number | null;
+  per_prompt_results: PromptEvalResult[];
+}
+
+export function useSkillQuality(id: string) {
+  return useQuery({
+    queryKey: ['agents', id, 'skill-quality'],
+    queryFn: () => apiFetch<{ history: SkillQualityEntry[] }>(`/agents/${id}/skill-quality`),
+    enabled: !!id,
+  });
+}
+
+export function usePreviewSoulEval(id: string) {
+  return useMutation({
+    mutationFn: (soul: string) =>
+      apiFetch<SoulPreviewEvalResult>(`/agents/${id}/soul/preview-eval`, {
+        method: 'POST',
+        body: JSON.stringify({ soul }),
+      }),
+  });
+}
+
 export function useIntegrateSoul(id: string) {
   return useMutation({
     mutationFn: ({ soul, suggestions }: { soul: string; suggestions: string[] }) =>

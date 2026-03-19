@@ -94,7 +94,9 @@ class ConsolidationPipeline:
             sw = SkillWriter(self._dir)
             skill_changed = sw.write(skill_content, self._config.agent_id)
             job_status.log(agent_id, task, "SKILL.md written")
-            self._run_skill_eval_safely(skill_content)
+            alert = self._run_skill_eval_safely(skill_content)
+            if alert:
+                self._run_skill_rollback_safely()
             self._run_structure_audit_safely()
 
             reg = Registry(DATA_DIR / "registry.json")
@@ -118,6 +120,9 @@ class ConsolidationPipeline:
                 job_status.log(agent_id, task, "soul_suggestions.md written")
             except Exception as e:
                 logger.warning(f"[{agent_id}] Soul suggestions failed (non-fatal): {e}")
+
+            if self._config.self_improving and self._config.skill_eval.enabled and self._config.skill_eval.prompts:
+                self._run_soul_autopilot(digest, learnings)
 
             try:
                 from core.session_report import write_session_report
@@ -246,13 +251,17 @@ class ConsolidationPipeline:
                 lines.append(f"- [{sev}] `{flag['path']}` — {flag['concern']}")
         return "\n".join(lines)
 
-    def _run_skill_eval_safely(self, skill_content: str) -> None:
-        """Run SKILL.md quality evaluation; swallow errors so consolidation succeeds."""
+    def _run_skill_eval_safely(self, skill_content: str) -> bool:
+        """Run SKILL.md quality evaluation; swallow errors so consolidation succeeds.
+
+        Returns True if a quality alert fired (score below threshold or >20% drop),
+        False otherwise (including on error).
+        """
         agent_id = self._config.agent_id
         task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
         eval_cfg = self._config.skill_eval
         if not (eval_cfg.enabled and eval_cfg.prompts):
-            return
+            return False
         try:
             job_status.update_step(agent_id, task, "Evaluating SKILL.md quality...")
             result = self._provider.evaluate_skill(skill_content, eval_cfg.prompts, self._soul)
@@ -264,8 +273,10 @@ class ConsolidationPipeline:
                 f"skill quality score: {result.score:.3f}"
                 + (" ⚠ ALERT" if alert else "")
             )
+            return alert
         except Exception as e:
             logger.warning(f"[{agent_id}] Skill quality check failed (non-fatal): {e}")
+            return False
 
     def _run_structure_audit_safely(self) -> None:
         """Run SKILL.md structure audit after consolidation; swallow errors."""
@@ -292,6 +303,144 @@ class ConsolidationPipeline:
             )
         except Exception as e:
             logger.warning(f"[{agent_id}] Structure audit failed (non-fatal): {e}")
+
+    def _run_skill_rollback_safely(self) -> None:
+        """Revert SKILL.md to its previous version on quality regression, then analyze root cause."""
+        agent_id = self._config.agent_id
+        task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
+        try:
+            sw = SkillWriter(self._dir)
+            reverted = sw.revert_to_previous(agent_id)
+            if not reverted:
+                logger.warning(f"[{agent_id}] Skill rollback skipped: no previous version found")
+                return
+            store = SkillQualityStore(self._dir)
+            hist = store.history()
+            score_after = hist[0]["score"] if hist else None       # bad score (just appended)
+            score_before = hist[1]["score"] if len(hist) >= 2 else None  # previous good
+            store.mark_rollback()
+            job_status.log(agent_id, task, "⚠ SKILL.md auto-rolled back: quality score below threshold")
+            from core.skill_regression_analyzer import analyze_regression, save_learnings
+            analysis = analyze_regression(self._dir, self._provider)
+            if analysis:
+                save_learnings(self._dir, analysis, agent_id, score_before=score_before, score_after=score_after)
+                job_status.log(agent_id, task, "regression analysis saved to skill_learnings.md")
+        except Exception as e:
+            logger.warning(f"[{agent_id}] Skill rollback failed (non-fatal): {e}")
+
+    def _run_soul_autopilot(self, digest: str, learnings: str | None) -> None:
+        """Test each soul suggestion independently; accumulate only the ones that pass.
+
+        Each suggestion is integrated, evaluated, and kept or discarded on its own merit.
+        The rolling baseline updates with each kept suggestion, so later suggestions are
+        measured against the already-improved soul — matching autoresearch's one-at-a-time loop.
+
+        Clears soul_suggestions.md after the full pass either way.
+        """
+        import re
+        agent_id = self._config.agent_id
+        task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
+        eval_cfg = self._config.skill_eval
+
+        suggestions_path = self._dir / "soul_suggestions.md"
+        if not suggestions_path.exists():
+            return
+        suggestions_text = suggestions_path.read_text("utf-8").strip()
+        if not suggestions_text:
+            return
+
+        store = SkillQualityStore(self._dir)
+        baseline_score = store.latest_score()
+        if baseline_score is None:
+            logger.info(f"[{agent_id}] Soul autopilot skipped: no baseline skill quality score")
+            return
+
+        # Parse into individual suggestions (## sections); fall back to whole text as one
+        individual = [
+            s.strip() for s in re.split(r'(?=^## )', suggestions_text, flags=re.MULTILINE)
+            if s.strip().startswith("## ")
+        ]
+        if not individual:
+            individual = [suggestions_text]
+
+        try:
+            from core.soul_experiment_log import append as log_experiment
+
+            _TOLERANCE = 0.02
+            current_soul = self._soul
+            current_baseline = baseline_score
+            last_kept_skill: str | None = None
+            last_kept_result = None
+            kept, discarded = 0, 0
+
+            job_status.update_step(agent_id, task, f"Soul autopilot: testing {len(individual)} suggestion(s) one by one…")
+
+            for i, suggestion in enumerate(individual):
+                label = f"[{i + 1}/{len(individual)}]"
+                job_status.log(agent_id, task, f"Soul autopilot {label}: integrating suggestion…")
+
+                candidate_soul = self._provider.integrate_soul_suggestions(current_soul, [suggestion])
+
+                job_status.log(agent_id, task, f"Soul autopilot {label}: generating candidate SKILL.md…")
+                candidate_skill = self._provider.generate_skill(
+                    digest, candidate_soul, agent_id, learnings=learnings
+                )
+
+                job_status.log(agent_id, task, f"Soul autopilot {label}: evaluating…")
+                candidate_result = self._provider.evaluate_skill(
+                    candidate_skill, eval_cfg.prompts, candidate_soul
+                )
+                candidate_score = candidate_result.score
+
+                action = "keep" if candidate_score >= current_baseline - _TOLERANCE else "discard"
+
+                log_experiment(
+                    agent_dir=self._dir,
+                    soul_before=current_soul,
+                    soul_after=candidate_soul,
+                    skill_score_before=current_baseline,
+                    skill_score_after=candidate_score,
+                    action=action,
+                    suggestions_count=1,
+                )
+
+                if action == "keep":
+                    current_soul = candidate_soul
+                    current_baseline = candidate_score
+                    last_kept_skill = candidate_skill
+                    last_kept_result = candidate_result
+                    kept += 1
+                    job_status.log(
+                        agent_id, task,
+                        f"Soul autopilot {label}: ✓ KEPT (score {current_baseline:.3f} → {candidate_score:.3f})"
+                    )
+                else:
+                    discarded += 1
+                    job_status.log(
+                        agent_id, task,
+                        f"Soul autopilot {label}: ✗ DISCARDED (score {current_baseline:.3f} → {candidate_score:.3f})"
+                    )
+
+            if kept > 0 and last_kept_skill is not None:
+                from core.config import save_soul, save_soul_backup
+                save_soul_backup(self._dir, self._soul)
+                save_soul(self._dir, current_soul)
+                self._soul = current_soul
+                sw = SkillWriter(self._dir)
+                sw.write(last_kept_skill, agent_id)
+                store.append(last_kept_result)
+                job_status.log(
+                    agent_id, task,
+                    f"Soul autopilot: done — {kept} kept, {discarded} discarded "
+                    f"(final score {current_baseline:.3f})"
+                )
+            else:
+                job_status.log(agent_id, task, f"Soul autopilot: done — all {discarded} suggestion(s) discarded")
+
+            suggestions_path.write_text("", "utf-8")
+
+        except Exception as e:
+            logger.warning(f"[{agent_id}] Soul autopilot failed (non-fatal): {e}")
 
     def _call_thesis_validation_safely(self) -> None:
         """Run thesis validation; swallow errors so consolidation succeeds."""

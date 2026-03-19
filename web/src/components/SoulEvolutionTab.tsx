@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { useUpdateSoul, useIntegrateSoul, useRevertSoul } from '../api/agents';
+import { useUpdateSoul, useIntegrateSoul, useRevertSoul, usePreviewSoulEval, type SoulPreviewEvalResult } from '../api/agents';
 
 function parseSuggestions(markdown: string): Array<{ id: string; title: string; content: string }> {
   // Primary: split on ## headings, keep only chunks that start with ##
@@ -46,9 +46,11 @@ export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggest
   const updateSoul = useUpdateSoul(agentId);
   const integrateSoul = useIntegrateSoul(agentId);
   const revertSoul = useRevertSoul(agentId);
+  const previewSoulEval = usePreviewSoulEval(agentId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [integrationMsg, setIntegrationMsg] = useState('');
   const [previewSoul, setPreviewSoul] = useState<string | null>(null);
+  const [evalResult, setEvalResult] = useState<SoulPreviewEvalResult | null>(null);
   const [incorporated, setIncorporated] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(`omnis_incorporated_${agentId}`);
@@ -91,10 +93,22 @@ export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggest
       setIncorporated(next);
       localStorage.setItem(`omnis_incorporated_${agentId}`, JSON.stringify([...next]));
       setPreviewSoul(null);
+      setEvalResult(null);
       setSelected(new Set());
       setIntegrationMsg('Soul updated. Revert available if needed.');
     } catch (e) {
       setIntegrationMsg('Error: ' + (e as Error).message);
+    }
+  };
+
+  const handleEvalImpact = async () => {
+    if (!previewSoul) return;
+    setEvalResult(null);
+    try {
+      const result = await previewSoulEval.mutateAsync(previewSoul);
+      setEvalResult(result);
+    } catch {
+      // error is surfaced via previewSoulEval.error
     }
   };
 
@@ -112,6 +126,38 @@ export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggest
               </svg>
               Preview — review before applying
             </div>
+            {/* Eval Impact score badge */}
+            {evalResult && (
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                color: evalResult.delta == null ? 'var(--color-text-muted)'
+                  : evalResult.delta > 0.005 ? '#4ade80'
+                  : evalResult.delta < -0.005 ? '#f87171'
+                  : 'var(--color-text-secondary)',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                {evalResult.delta == null ? `score: ${evalResult.score_after.toFixed(3)}`
+                  : evalResult.delta > 0.005 ? `▲ +${evalResult.delta.toFixed(3)}`
+                  : evalResult.delta < -0.005 ? `▼ ${evalResult.delta.toFixed(3)}`
+                  : `● ±0 (${evalResult.score_after.toFixed(3)})`}
+              </div>
+            )}
+            {previewSoulEval.error && (
+              <span style={{ fontSize: 11, color: 'var(--color-status-error)', fontFamily: 'var(--font-mono)' }}>
+                Eval failed
+              </span>
+            )}
+            <button
+              onClick={handleEvalImpact}
+              disabled={previewSoulEval.isPending}
+              title="Generate a candidate skill with this soul and measure quality impact before applying"
+              style={{ padding: '5px 12px', fontSize: 11, borderRadius: 6, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: previewSoulEval.isPending ? 'default' : 'pointer', opacity: previewSoulEval.isPending ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)' }}
+            >
+              {previewSoulEval.isPending && (
+                <div style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid var(--color-accent-dim)', borderTopColor: 'var(--color-accent)', animation: 'spin 0.8s linear infinite' }} />
+              )}
+              {previewSoulEval.isPending ? 'Evaluating…' : 'Eval Impact'}
+            </button>
             <button
               onClick={handleApply}
               disabled={updateSoul.isPending}
@@ -123,7 +169,7 @@ export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggest
               ✓ Apply Soul
             </button>
             <button
-              onClick={() => setPreviewSoul(null)}
+              onClick={() => { setPreviewSoul(null); setEvalResult(null); }}
               style={{ padding: '5px 12px', fontSize: 11, borderRadius: 6, border: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-surface-3)', color: 'var(--color-text-secondary)', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}
             >
               ✗ Cancel

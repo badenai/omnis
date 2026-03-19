@@ -20,6 +20,7 @@ from api.schemas import (
     IngestChannelExecuteRequest,
     IngestUrlRequest,
     SoulIntegrateRequest,
+    SoulPreviewEvalRequest,
     SoulUpdate,
     SourceStats,
 )
@@ -254,6 +255,58 @@ def integrate_soul(agent_id: str, body: SoulIntegrateRequest, request: Request):
     return {"integrated_soul": integrated}
 
 
+@router.post("/{agent_id}/soul/preview-eval")
+def preview_soul_eval(agent_id: str, body: SoulPreviewEvalRequest, request: Request):
+    """Generate a candidate SKILL.md for a proposed soul and measure quality impact.
+
+    Returns the baseline score (from the last consolidation) and the candidate score,
+    so the user can see the quality impact before applying the soul change.
+    No files are written.
+    """
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    agent = agents[agent_id]
+    config = agent["config"]
+    skill_cfg = config.skill_eval
+    if not (skill_cfg.enabled and skill_cfg.prompts):
+        raise HTTPException(400, "Skill evaluation is not configured for this agent")
+
+    agent_dir = agent["dir"]
+    from core.skill_quality import SkillQualityStore
+    store = SkillQualityStore(agent_dir)
+    score_before = store.latest_score()
+
+    digest_path = agent_dir / "digest.md"
+    if not digest_path.exists():
+        raise HTTPException(400, "No digest.md found — run consolidation first")
+    digest = digest_path.read_text("utf-8")
+
+    from core.skill_regression_analyzer import read_learnings
+    learnings = read_learnings(agent_dir)
+
+    candidate_skill = agent["provider"].generate_skill(
+        digest, body.soul, config.agent_id, learnings=learnings
+    )
+    result = agent["provider"].evaluate_skill(candidate_skill, skill_cfg.prompts, body.soul)
+
+    return {
+        "score_before": score_before,
+        "score_after": result.score,
+        "delta": round(result.score - score_before, 4) if score_before is not None else None,
+        "per_prompt_results": [
+            {
+                "prompt": r.prompt,
+                "with_skill_score": r.with_skill_score,
+                "without_skill_score": r.without_skill_score,
+                "delta": r.delta,
+                "grader_reasoning": r.grader_reasoning,
+            }
+            for r in result.eval_results
+        ],
+    }
+
+
 @router.post("/{agent_id}/soul/revert", response_model=AgentDetail)
 def revert_soul(agent_id: str, request: Request):
     agents = _get_agents(request)
@@ -359,6 +412,16 @@ def ingest_channel_preview(
     except DownloadError as exc:
         raise HTTPException(422, detail=f"Could not fetch channel: {exc}")
     return {"count": len(videos), "videos": videos}
+
+
+@router.get("/{agent_id}/skill-quality")
+def get_skill_quality(agent_id: str, request: Request):
+    agents = _get_agents(request)
+    if agent_id not in agents:
+        raise HTTPException(404, f"Agent '{agent_id}' not found")
+    from core.skill_quality import SkillQualityStore
+    store = SkillQualityStore(agents[agent_id]["dir"])
+    return {"history": store.history()}
 
 
 @router.get("/{agent_id}/soul-suggestions")
