@@ -7,10 +7,9 @@ import {
   useTriggerFactCheck, useResetSourceStatus, useJobs, useSoulSuggestions,
   useDiscoveredSources,
 } from '../api/scheduler';
-import AgentForm from './AgentForm';
-import SoulEditor from './SoulEditor';
-import SoulEvolutionTab from './SoulEvolutionTab';
 import KnowledgeBrowser from './KnowledgeBrowser';
+import SoulTab from './SoulTab';
+import ConfigSidebar from './ConfigSidebar';
 import SkillTab from './SkillTab';
 import ChatPanel from './ChatPanel';
 import IngestPanel from './IngestPanel';
@@ -49,24 +48,6 @@ function parseDiscoveredSourceIds(content: string, since: string | null): Set<st
     result.add(idLine[1]);
   }
   return result;
-}
-
-function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{ width: '100%', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
-      >
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-secondary)' }}>{title}</span>
-        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ transition: 'transform 200ms', transform: open ? 'rotate(180deg)' : 'none', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && <div style={{ padding: '0 20px 20px' }}>{children}</div>}
-    </div>
-  );
 }
 
 type ActiveTab = 'knowledge' | 'skill' | 'channels' | 'inbox' | 'session' | 'soul';
@@ -135,7 +116,6 @@ export default function AgentDetail() {
   const deleteAgent = useDeleteAgent();
   const [viewMode, setViewMode] = useState<'chat' | 'manage'>('chat');
   const [showIngest, setShowIngest] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('knowledge');
   const [newSourceType, setNewSourceType] = useState<'youtube' | 'medium' | 'web_page' | 'reddit'>('youtube');
   const [newHandle, setNewHandle] = useState('');
@@ -827,87 +807,22 @@ export default function AgentDetail() {
 
                 {/* Soul tab */}
                 {activeTab === 'soul' && (
-                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <SoulEvolutionTab
-                      agentId={agent.agent_id}
-                      soul={agent.soul}
-                      hasSoulBackup={agent.has_soul_backup}
-                      suggestionsData={suggestionsData}
-                      refetchSuggestions={refetchSuggestions}
-                      isFetchingSuggestions={isFetchingSuggestions}
-                    />
-                  </div>
+                  <SoulTab
+                    key={agent.soul}
+                    agentId={agent.agent_id}
+                    agent={agent}
+                    suggestionsData={suggestionsData}
+                    refetchSuggestions={refetchSuggestions}
+                    isFetchingSuggestions={isFetchingSuggestions}
+                  />
                 )}
 
               </div>
             </div>
           </div>
 
-          {/* Right: Inspector (collapsible) */}
-          <aside style={{
-            width: inspectorOpen ? 360 : 40,
-            flexShrink: 0,
-            borderLeft: '1px solid var(--color-border-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            backgroundColor: 'var(--color-surface-1)',
-            transition: 'width 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}>
-            {/* Header / toggle */}
-            <div style={{
-              flexShrink: 0,
-              padding: inspectorOpen ? '12px 20px' : '12px 0',
-              borderBottom: '1px solid var(--color-border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: 'rgba(18,18,22,0.96)',
-              backdropFilter: 'blur(8px)',
-              zIndex: 10,
-              justifyContent: inspectorOpen ? 'flex-start' : 'center',
-              position: 'sticky',
-              top: 0,
-            }}>
-              {inspectorOpen ? (
-                <>
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--color-text-muted)', flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', flex: 1 }}>Agent Inspector</span>
-                  <button
-                    onClick={() => setInspectorOpen(false)}
-                    title="Collapse Inspector"
-                    style={{ padding: 4, borderRadius: 4, border: 'none', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
-                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-                  >
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setInspectorOpen(true)}
-                  title="Expand Inspector"
-                  style={{ padding: 6, borderRadius: 4, border: 'none', backgroundColor: 'transparent', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-muted)')}
-                >
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-              )}
-            </div>
-
-            {/* Scrollable content */}
-            {inspectorOpen && (
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                <Section title="Core Identity (Soul)">
-                  <SoulEditor agentId={agent.agent_id} initialSoul={agent.soul} />
-                </Section>
-                <Section title="Configuration" defaultOpen={false}>
-                  <AgentForm agent={agent} />
-                </Section>
-              </div>
-            )}
-          </aside>
+          {/* Right: Configuration sidebar */}
+          <ConfigSidebar key={agent.agent_id} agentId={agent.agent_id} agent={agent} />
         </div>
           </div>
         </div>
