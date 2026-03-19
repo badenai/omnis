@@ -88,6 +88,7 @@ export default function SoulTab({ agentId, agent, suggestionsData, refetchSugges
           suggestionsData={suggestionsData}
           refetchSuggestions={refetchSuggestions}
           isFetchingSuggestions={isFetchingSuggestions}
+          onSoulChange={setSoul}
         />
       )}
 

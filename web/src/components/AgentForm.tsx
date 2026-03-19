@@ -4,19 +4,7 @@ import { useCreateAgent, useUpdateConfig } from '../api/agents';
 import type { AgentDetail } from '../types';
 import Tooltip from './Tooltip';
 import SoulAssistantPanel from './SoulAssistantPanel';
-
-function cronToTime(cron: string): string {
-  const parts = cron.trim().split(/\s+/);
-  if (parts.length < 2) return '03:00';
-  const min = parts[0].padStart(2, '0');
-  const hr = parts[1].padStart(2, '0');
-  return `${hr}:${min}`;
-}
-
-function timeToCron(time: string): string {
-  const [hr, min] = time.split(':');
-  return `${parseInt(min, 10)} ${parseInt(hr, 10)} * * *`;
-}
+import { cronToTime, timeToCron } from '../utils/cron';
 
 interface Props {
   agent?: AgentDetail;

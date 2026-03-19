@@ -39,9 +39,10 @@ interface SoulEvolutionTabProps {
   suggestionsData: { suggestions: string | null } | undefined;
   refetchSuggestions: () => void;
   isFetchingSuggestions: boolean;
+  onSoulChange?: (s: string) => void;
 }
 
-export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggestionsData, refetchSuggestions, isFetchingSuggestions }: SoulEvolutionTabProps) {
+export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggestionsData, refetchSuggestions, isFetchingSuggestions, onSoulChange }: SoulEvolutionTabProps) {
   const updateSoul = useUpdateSoul(agentId);
   const integrateSoul = useIntegrateSoul(agentId);
   const revertSoul = useRevertSoul(agentId);
@@ -84,6 +85,7 @@ export default function SoulEvolutionTab({ agentId, soul, hasSoulBackup, suggest
     if (!previewSoul) return;
     try {
       await updateSoul.mutateAsync(previewSoul);
+      onSoulChange?.(previewSoul);
       const next = new Set(incorporated);
       suggestions.filter(s => selected.has(s.id)).forEach(s => next.add(s.title));
       setIncorporated(next);
