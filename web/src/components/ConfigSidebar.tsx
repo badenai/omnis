@@ -51,6 +51,7 @@ export default function ConfigSidebar({ agentId, agent }: Props) {
   const [runTime, setRunTime] = useState(cronToTime(agent.consolidation_schedule));
   const [halfLife, setHalfLife] = useState(agent.decay.half_life_days);
   const [selfImproving, setSelfImproving] = useState(agent.self_improving);
+  const [pluginVersion, setPluginVersion] = useState(agent.plugin_version ?? '');
   const [message, setMessage] = useState('');
 
   const handleSave = async () => {
@@ -64,6 +65,7 @@ export default function ConfigSidebar({ agentId, agent }: Props) {
         consolidation_schedule: timeToCron(runTime),
         decay: { half_life_days: halfLife },
         self_improving: selfImproving,
+        plugin_version: pluginVersion || null,
       });
       setMessage('Saved.');
     } catch (err) {
@@ -155,6 +157,19 @@ export default function ConfigSidebar({ agentId, agent }: Props) {
                 type="text"
                 value={consolidationModel}
                 onChange={e => setConsolidationModel(e.target.value)}
+                style={inputStyle}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}
+              />
+            </div>
+
+            <div>
+              <label style={fieldLabel}>Plugin Version</label>
+              <input
+                type="text"
+                value={pluginVersion}
+                onChange={e => setPluginVersion(e.target.value)}
+                placeholder="e.g. 1.0 (empty = auto)"
                 style={inputStyle}
                 onFocus={e => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
                 onBlur={e => (e.currentTarget.style.borderColor = 'var(--color-border-default)')}

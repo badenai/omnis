@@ -101,6 +101,7 @@ class AgentConfig:
     self_improving: bool = True
     skill_eval: SkillEvalConfig = field(default_factory=SkillEvalConfig)
     paused: bool = False
+    plugin_version: str | None = None  # pin version e.g. "1.0"; None = auto-increment
 
 
 @dataclass

@@ -190,8 +190,9 @@ class PluginWriter:
     the plugin cache path in agent_dir/primary_skill_path.txt.
     """
 
-    def __init__(self, agent_dir: pathlib.Path):
+    def __init__(self, agent_dir: pathlib.Path, version_override: str | None = None):
         self._agent_dir = agent_dir
+        self._version_override = version_override
 
     def write(self, plugin_output: "PluginOutput") -> bool:
         """Write full plugin structure. Returns True if primary skill changed.
@@ -201,13 +202,16 @@ class PluginWriter:
         """
         agent_id = plugin_output.agent_id
 
-        # --- Increment per-agent plugin version ---
+        # --- Resolve plugin version (config pin or auto-increment) ---
         version_file = self._agent_dir / "plugin_version.txt"
-        prev = version_file.read_text("utf-8").strip() if version_file.exists() else "0"
-        try:
-            version = str(int(prev) + 1)
-        except ValueError:
-            version = "1"
+        if self._version_override is not None:
+            version = str(self._version_override)
+        else:
+            prev = version_file.read_text("utf-8").strip() if version_file.exists() else "0"
+            try:
+                version = str(int(prev) + 1)
+            except ValueError:
+                version = "1"
 
         install_path = (
             pathlib.Path.home()

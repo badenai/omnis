@@ -101,7 +101,7 @@ class ConsolidationPipeline:
                 digest, self._soul, self._config.agent_id,
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
-            pw = PluginWriter(self._dir)
+            pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
             skill_changed = pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             job_status.log(
@@ -206,7 +206,7 @@ class ConsolidationPipeline:
                 digest, self._soul, self._config.agent_id,
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
-            pw = PluginWriter(self._dir)
+            pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
             pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             self._run_skill_eval_safely(primary_skill_content)

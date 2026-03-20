@@ -81,6 +81,7 @@ export interface AgentDetail {
   soul: string;
   self_improving: boolean;
   skill_eval: SkillEvalConfig;
+  plugin_version: string | null;
   last_checked: Record<string, string>;
   last_consolidation: string | null;
   inbox_count: number;
@@ -103,6 +104,7 @@ export interface AgentConfigCreate {
   consolidation_model: string;
   soul: string;
   self_improving: boolean;
+  plugin_version?: string | null;
   skill_eval?: SkillEvalConfig;
 }
 
@@ -115,6 +117,7 @@ export interface AgentConfigUpdate {
   collection_model?: string;
   consolidation_model?: string;
   self_improving?: boolean;
+  plugin_version?: string | null;
   skill_eval?: SkillEvalConfig;
 }
 

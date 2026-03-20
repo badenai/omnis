@@ -96,6 +96,7 @@ export default function AgentForm({ agent }: Props) {
   );
   const [halfLife, setHalfLife] = useState(agent?.decay.half_life_days ?? 365);
   const [selfImproving, setSelfImproving] = useState(agent?.self_improving ?? true);
+  const [pluginVersion, setPluginVersion] = useState(agent?.plugin_version ?? '');
   const [soul, setSoul] = useState('');
   const [showSoulAssistant, setShowSoulAssistant] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -116,6 +117,7 @@ export default function AgentForm({ agent }: Props) {
           collection_model: collectionModel,
           consolidation_model: consolidationModel,
           self_improving: selfImproving,
+          plugin_version: pluginVersion || null,
         });
         setMessage('Config saved.');
       } else {
@@ -130,6 +132,7 @@ export default function AgentForm({ agent }: Props) {
           consolidation_model: consolidationModel,
           soul,
           self_improving: selfImproving,
+          plugin_version: pluginVersion || null,
         });
         navigate(`/agents/${agentId}`);
       }
@@ -190,6 +193,16 @@ export default function AgentForm({ agent }: Props) {
           />
         </Field>
       </div>
+
+      <Field label="Plugin Version" tooltip="Pin the Claude Code plugin to a specific version (e.g. 1.0, 1.1). Leave empty to auto-increment on each consolidation. Bump the version manually to force Claude Code to reload the plugin.">
+        <StyledInput
+          type="text"
+          value={pluginVersion}
+          onChange={(e) => setPluginVersion(e.target.value)}
+          placeholder="e.g. 1.0 (leave empty to auto-increment)"
+          mono
+        />
+      </Field>
 
       <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
         <StyledInput

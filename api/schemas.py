@@ -31,6 +31,7 @@ class AgentConfigCreate(BaseModel):
     consolidation_model: str = "gemini-3.1-pro-preview"
     soul: str = ""
     self_improving: bool = True
+    plugin_version: str | None = None
     skill_eval: SkillEvalConfig = SkillEvalConfig()
 
 
@@ -43,6 +44,7 @@ class AgentConfigUpdate(BaseModel):
     collection_model: str | None = None
     consolidation_model: str | None = None
     self_improving: bool | None = None
+    plugin_version: str | None = None
     skill_eval: SkillEvalConfig | None = None
     paused: bool | None = None
 
@@ -85,6 +87,7 @@ class AgentDetail(BaseModel):
     consolidation_model: str
     soul: str
     self_improving: bool = True
+    plugin_version: str | None = None
     skill_eval: SkillEvalConfig = SkillEvalConfig()
     last_checked: dict = {}
     last_consolidation: str | None = None

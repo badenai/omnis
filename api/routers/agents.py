@@ -96,6 +96,7 @@ def _agent_detail(agent: dict) -> AgentDetail:
         consolidation_model=config.consolidation_model,
         soul=agent["soul"],
         self_improving=config.self_improving,
+        plugin_version=config.plugin_version,
         skill_eval=SkillEvalConfigSchema(
             prompts=config.skill_eval.prompts,
             min_quality_threshold=config.skill_eval.min_quality_threshold,
@@ -166,6 +167,7 @@ def create_agent(body: AgentConfigCreate, request: Request):
         "collection_model": body.collection_model,
         "consolidation_model": body.consolidation_model,
         "self_improving": body.self_improving,
+        "plugin_version": body.plugin_version,
         "skill_eval": body.skill_eval.model_dump(),
         "paused": False,
     }
@@ -208,6 +210,7 @@ def update_config(agent_id: str, body: AgentConfigUpdate, request: Request):
         "collection_model": body.collection_model if body.collection_model is not None else config.collection_model,
         "consolidation_model": body.consolidation_model if body.consolidation_model is not None else config.consolidation_model,
         "self_improving": body.self_improving if body.self_improving is not None else config.self_improving,
+        "plugin_version": body.plugin_version if body.plugin_version is not None else config.plugin_version,
         "skill_eval": (
             body.skill_eval.model_dump() if body.skill_eval is not None
             else {
