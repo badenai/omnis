@@ -100,8 +100,8 @@ export default function ChatPanel({ agentId, soul }: { agentId: string; soul?: s
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Scrollable messages area */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      {/* Scrollable messages area — paddingTop clears the floating header pill */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingTop: 64 }}>
         {messages.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', paddingBottom: 48 }}>
             <div style={{

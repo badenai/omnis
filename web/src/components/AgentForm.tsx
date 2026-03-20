@@ -194,24 +194,25 @@ export default function AgentForm({ agent }: Props) {
         </Field>
       </div>
 
-      <Field label="Plugin Version" tooltip="Pin the Claude Code plugin to a specific version (e.g. 1.0, 1.1). Leave empty to auto-increment on each consolidation. Bump the version manually to force Claude Code to reload the plugin.">
-        <StyledInput
-          type="text"
-          value={pluginVersion}
-          onChange={(e) => setPluginVersion(e.target.value)}
-          placeholder="e.g. 1.0 (leave empty to auto-increment)"
-          mono
-        />
-      </Field>
-
-      <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
-        <StyledInput
-          type="time"
-          value={runTime}
-          onChange={(e) => setRunTime(e.target.value)}
-          mono
-        />
-      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Daily Run Time" tooltip="Time of day (UTC) when the agent runs its full pipeline: collect new videos from all channels → consolidate into knowledge → self-improving research (if enabled).">
+          <StyledInput
+            type="time"
+            value={runTime}
+            onChange={(e) => setRunTime(e.target.value)}
+            mono
+          />
+        </Field>
+        <Field label="Plugin Version" tooltip="Pin the Claude Code plugin to a specific version (e.g. 1.0, 1.1). Leave empty to auto-increment on each consolidation. Bump the version manually to force Claude Code to reload the plugin.">
+          <StyledInput
+            type="text"
+            value={pluginVersion}
+            onChange={(e) => setPluginVersion(e.target.value)}
+            placeholder="e.g. 1.0 (auto)"
+            mono
+          />
+        </Field>
+      </div>
 
       <Field label={`Decay Half-Life: ${halfLife} days`} tooltip="How long before a knowledge file loses half its importance. Short (30–90 days) for fast-moving topics like news. Long (365+ days) for timeless knowledge like techniques or theory. Set to 9999 for permanent.">
         <input
