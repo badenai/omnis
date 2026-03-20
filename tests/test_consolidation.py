@@ -29,18 +29,17 @@ def test_consolidation_generates_digest_when_inbox_has_items(tmp_path, mocker):
         updated_files=[], created_files=[]
     )
     mock_provider.generate_digest.return_value = "# Digest\nContent."
-    mock_provider.generate_skill.return_value = "---\nname: test\n---\n# Skill"
+    mock_provider.generate_plugin_skills.return_value.skills = []
 
-    with patch("core.consolidation.SkillWriter") as MockSW, \
+    with patch("core.consolidation.PluginWriter"), \
          patch("core.consolidation.Registry"):
-        MockSW.return_value.write.return_value = tmp_path / "SKILL.md"
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 
     assert (tmp_path / "digest.md").exists()
     assert "# Digest" in (tmp_path / "digest.md").read_text()
     mock_provider.generate_digest.assert_called_once()
-    mock_provider.generate_skill.assert_called_once()
+    mock_provider.generate_plugin_skills.assert_called_once()
 
 
 def test_consolidation_clears_inbox_after_run(tmp_path, mocker):
@@ -52,7 +51,7 @@ def test_consolidation_clears_inbox_after_run(tmp_path, mocker):
     mock_provider.generate_digest.return_value = "# Digest"
     mock_provider.generate_skill.return_value = "# Skill"
 
-    with patch("core.consolidation.SkillWriter"), \
+    with patch("core.consolidation.PluginWriter"), \
          patch("core.consolidation.Registry"):
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
@@ -80,11 +79,10 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     mock_provider = MagicMock()
     mock_provider.reevaluate_knowledge.return_value = {"concepts/topic.md": 0.3}
     mock_provider.generate_digest.return_value = "# Digest\nContent."
-    mock_provider.generate_skill.return_value = "---\nname: test\n---\n# Skill"
+    mock_provider.generate_plugin_skills.return_value.skills = []
 
-    with patch("core.consolidation.SkillWriter") as MockSW, \
+    with patch("core.consolidation.PluginWriter"), \
          patch("core.consolidation.Registry"):
-        MockSW.return_value.write.return_value = tmp_path / "SKILL.md"
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run_reevaluation()
 
@@ -95,4 +93,4 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     assert (tmp_path / "digest.md").exists()
     mock_provider.reevaluate_knowledge.assert_called_once()
     mock_provider.generate_digest.assert_called_once()
-    mock_provider.generate_skill.assert_called_once()
+    mock_provider.generate_plugin_skills.assert_called_once()

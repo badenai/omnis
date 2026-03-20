@@ -25,6 +25,7 @@ def test_consolidation_writes_digest_md(tmp_path, mocker):
     pipeline = ConsolidationPipeline(tmp_path, config, provider, soul="Be an expert.")
     mocker.patch("core.consolidation.Registry")
     mocker.patch("core.consolidation.AgentState")
+    mocker.patch("core.consolidation.PluginWriter")
     pipeline.run()
 
     assert (tmp_path / "digest.md").exists(), "digest.md must be written"

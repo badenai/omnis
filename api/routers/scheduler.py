@@ -185,9 +185,6 @@ def trigger_fact_check(agent_id: str, source_id: str, request: Request):
     return {"status": "triggered", "agent_id": agent_id, "source_id": source_id}
 
 
-_SKILL_PLUGIN_VERSION = "1.0.0"
-
-
 @router.post("/trigger/{agent_id}/audit-skill")
 def trigger_audit_skill(agent_id: str, request: Request):
     """Combined audit: structure check + trigger description optimization."""
@@ -200,16 +197,11 @@ def trigger_audit_skill(agent_id: str, request: Request):
     soul: str = agent["soul"]
     provider = agent["provider"]
 
-    skill_dir = (
-        pathlib.Path.home()
-        / ".claude" / "plugins" / "cache"
-        / APP_NAME / APP_NAME / _SKILL_PLUGIN_VERSION
-        / "skills" / agent_id
-    )
-    if not skill_dir.exists():
+    skill_path = agent_dir / "SKILL.md"
+    if not skill_path.exists():
         raise HTTPException(
             400,
-            f"Skill directory not found at {skill_dir} — run consolidation first to generate SKILL.md.",
+            f"SKILL.md not found at {skill_path} — run consolidation first to generate SKILL.md.",
         )
 
     from core.description_optimizer import run_structure_audit, apply_structure_fixes, run_description_optimization
@@ -226,7 +218,7 @@ def trigger_audit_skill(agent_id: str, request: Request):
             result = run_structure_audit(
                 agent_dir=agent_dir,
                 agent_id=agent_id,
-                skill_dir=skill_dir,
+                skill_path=skill_path,
                 provider=provider,
                 job_log_fn=job_status.log,
             )
@@ -244,7 +236,7 @@ def trigger_audit_skill(agent_id: str, request: Request):
                 apply_structure_fixes(
                     agent_dir=agent_dir,
                     agent_id=agent_id,
-                    skill_dir=skill_dir,
+                    skill_path=skill_path,
                     provider=provider,
                     job_log_fn=job_status.log,
                 )
@@ -256,7 +248,7 @@ def trigger_audit_skill(agent_id: str, request: Request):
             best = run_description_optimization(
                 agent_dir=agent_dir,
                 agent_id=agent_id,
-                skill_dir=skill_dir,
+                skill_path=skill_path,
                 soul=soul,
                 provider=provider,
                 job_log_fn=job_status.log,

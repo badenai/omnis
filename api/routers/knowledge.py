@@ -1,10 +1,12 @@
 import pathlib
 import logging
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.knowledge import KnowledgeWriter
+
 from core import job_status
 from core.scheduler_instance import get_scheduler
 from api.schemas import KnowledgeFile, KnowledgeFileContent
@@ -52,6 +54,56 @@ def read_knowledge_file(agent_id: str, path: str = Query(...), request: Request 
                 metadata=f["metadata"],
             )
     raise HTTPException(404, f"Knowledge file '{path}' not found")
+
+
+@router.get("/{agent_id}/skills")
+def list_plugin_skills(agent_id: str, request: Request):
+    """List all topic-clustered plugin skills for an agent.
+
+    Returns skills from agent_dir/skills/*/SKILL.md (source of truth).
+    """
+    agent = _get_agent(agent_id, request)
+    skills_dir = agent["dir"] / "skills"
+    if not skills_dir.exists():
+        return []
+
+    skills = []
+    for cluster_dir in sorted(skills_dir.iterdir()):
+        skill_file = cluster_dir / "SKILL.md"
+        if not skill_file.is_file():
+            continue
+
+        content = skill_file.read_text(encoding="utf-8")
+
+        # Parse YAML frontmatter fields
+        name = cluster_dir.name
+        description = ""
+        file_pattern = None
+        bash_pattern = None
+
+        fm_match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+        if fm_match:
+            for line in fm_match.group(1).splitlines():
+                if line.startswith("name:"):
+                    name = line.split(":", 1)[1].strip()
+                elif line.startswith("description:"):
+                    description = line.split(":", 1)[1].strip()
+                elif line.startswith("filePattern:"):
+                    val = line.split(":", 1)[1].strip().strip('"')
+                    file_pattern = val if val and val != "null" else None
+                elif line.startswith("bashPattern:"):
+                    val = line.split(":", 1)[1].strip().strip('"')
+                    bash_pattern = val if val and val != "null" else None
+
+        skills.append({
+            "name": name,
+            "description": description,
+            "file_pattern": file_pattern,
+            "bash_pattern": bash_pattern,
+            "content": content,
+        })
+
+    return skills
 
 
 @router.get("/{agent_id}/skill")

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useKnowledge, useKnowledgeFile, useSkill, useDigest, useKnowledgeSearch, useSkillQuality, useSkillAudit } from '../api/knowledge';
-import type { QualityHistoryEntry, PromptEvalResult, StructureIssue } from '../types';
+import { useKnowledge, useKnowledgeFile, useSkill, useDigest, useKnowledgeSearch, useSkillQuality, useSkillAudit, useSkills } from '../api/knowledge';
+import type { QualityHistoryEntry, PromptEvalResult, StructureIssue, PluginSkill } from '../types';
 
 interface Props {
   agentId: string;
@@ -343,8 +343,10 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const { data: files, isLoading } = useKnowledge(agentId);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [specialView, setSpecialView] = useState<'skill' | 'digest' | null>(null);
+  const [specialView, setSpecialView] = useState<'skill' | 'digest' | 'plugin-skill' | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedPluginSkill, setSelectedPluginSkill] = useState<PluginSkill | null>(null);
+  const [pluginSkillsOpen, setPluginSkillsOpen] = useState(true);
 
   const { data: fileContent } = useKnowledgeFile(agentId, specialView ? null : selectedPath);
   const { data: skill } = useSkill(agentId);
@@ -352,6 +354,7 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const { data: searchResults } = useKnowledgeSearch(agentId, searchQuery);
   const { data: qualityData } = useSkillQuality(agentId);
   const { data: auditData } = useSkillAudit(agentId);
+  const { data: pluginSkills } = useSkills(agentId);
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)', fontSize: 13 }}>
@@ -363,6 +366,7 @@ export default function KnowledgeBrowser({ agentId }: Props) {
   const activeContent =
     specialView === 'skill' ? skill?.content
     : specialView === 'digest' ? digest?.content
+    : specialView === 'plugin-skill' ? selectedPluginSkill?.content
     : fileContent?.content;
 
   const currentFile = displayFiles?.find(f => f.path === selectedPath);
@@ -461,6 +465,84 @@ export default function KnowledgeBrowser({ agentId }: Props) {
           </button>
         </div>
 
+        {/* Plugin Skills */}
+        {pluginSkills && pluginSkills.length > 0 && (
+          <div style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+            <button
+              onClick={() => setPluginSkillsOpen(o => !o)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '6px 10px',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-text-muted)', flex: 1 }}>
+                Plugin Skills
+              </span>
+              <span style={{
+                fontSize: 9, fontFamily: 'var(--font-mono)', padding: '1px 5px', borderRadius: 3,
+                backgroundColor: 'rgba(139,92,246,0.1)', color: 'rgba(139,92,246,0.8)',
+                border: '1px solid rgba(139,92,246,0.2)',
+              }}>
+                {pluginSkills.length}
+              </span>
+              <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>
+                {pluginSkillsOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {pluginSkillsOpen && (
+              <div style={{ padding: '2px 10px 6px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {pluginSkills.map(ps => {
+                  const isActive = specialView === 'plugin-skill' && selectedPluginSkill?.name === ps.name;
+                  const label = ps.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                  return (
+                    <button
+                      key={ps.name}
+                      onClick={() => {
+                        setSpecialView('plugin-skill');
+                        setSelectedPluginSkill(ps);
+                        setSelectedPath(null);
+                        setShowHistory(false);
+                      }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '5px 8px',
+                        borderRadius: 5, fontSize: 11, fontFamily: 'var(--font-mono)',
+                        border: isActive ? '1px solid var(--color-accent-dim)' : '1px solid transparent',
+                        cursor: 'pointer',
+                        backgroundColor: isActive ? 'var(--color-accent-glow)' : 'transparent',
+                        color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                        transition: 'all 120ms',
+                      }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-surface-2)'; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {label}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        {ps.description && (
+                          <span style={{ fontSize: 9, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            {ps.description.slice(0, 40)}{ps.description.length > 40 ? '…' : ''}
+                          </span>
+                        )}
+                        {ps.file_pattern && (
+                          <span style={{
+                            fontSize: 8, fontFamily: 'var(--font-mono)', flexShrink: 0,
+                            color: 'rgba(139,92,246,0.7)', backgroundColor: 'rgba(139,92,246,0.08)',
+                            padding: '1px 4px', borderRadius: 3, border: '1px solid rgba(139,92,246,0.15)',
+                          }}>
+                            {ps.file_pattern.length > 14 ? ps.file_pattern.slice(0, 14) + '…' : ps.file_pattern}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* File tree */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
           {Object.entries(grouped).map(([dir, dirFiles]) => (
@@ -543,19 +625,32 @@ export default function KnowledgeBrowser({ agentId }: Props) {
           </div>
         )}
 
-        {/* Special file header (SKILL.md / digest.md) */}
+        {/* Special file header (SKILL.md / digest.md / plugin-skill) */}
         {specialView && (
           <div style={{ borderBottom: '1px solid var(--color-border-subtle)', flexShrink: 0, backgroundColor: 'var(--color-surface-1)' }}>
             {/* Title row */}
             <div style={{ padding: '10px 20px 8px', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>
-                  {specialView === 'skill' ? 'SKILL.md' : 'digest.md'}
+                  {specialView === 'skill' ? 'SKILL.md'
+                    : specialView === 'digest' ? 'digest.md'
+                    : selectedPluginSkill?.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) ?? 'Plugin Skill'}
                 </div>
                 <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', marginTop: 1 }}>
-                  {specialView === 'skill' ? 'Generated skill file for Claude Code injection' : 'Latest consolidation digest'}
+                  {specialView === 'skill' ? 'Generated skill file for Claude Code injection'
+                    : specialView === 'digest' ? 'Latest consolidation digest'
+                    : selectedPluginSkill?.description ?? 'Topic-clustered plugin skill'}
                 </div>
               </div>
+              {specialView === 'plugin-skill' && selectedPluginSkill?.file_pattern && (
+                <span style={{
+                  fontSize: 9, fontFamily: 'var(--font-mono)', flexShrink: 0,
+                  color: 'rgba(139,92,246,0.8)', backgroundColor: 'rgba(139,92,246,0.08)',
+                  padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(139,92,246,0.2)',
+                }}>
+                  {selectedPluginSkill.file_pattern}
+                </span>
+              )}
             </div>
 
             {/* Quality strip — SKILL.md only, single compact row */}

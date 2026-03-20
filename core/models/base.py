@@ -1,7 +1,7 @@
 from typing import Protocol, TYPE_CHECKING
 from core.models.types import AnalysisResult, ConsolidationResult
 if TYPE_CHECKING:
-    from core.models.types import SkillEvalResult
+    from core.models.types import SkillEvalResult, PluginOutput
 
 
 class KnowledgeProvider(Protocol):
@@ -16,6 +16,12 @@ class KnowledgeProvider(Protocol):
     def generate_digest(self, knowledge_files: list[dict], soul: str) -> str: ...
 
     def generate_skill(self, digest: str, soul: str, agent_id: str) -> str: ...
+
+    def generate_plugin_skills(
+        self, digest: str, soul: str, agent_id: str,
+        learnings: str | None = None,
+        existing_clusters: list[str] | None = None,
+    ) -> "PluginOutput": ...
 
     def consolidate(
         self, inbox_items: list[str], existing_index: str, soul: str

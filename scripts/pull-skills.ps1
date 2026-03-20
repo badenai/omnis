@@ -1,12 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Pull SKILL.md files from the remote Omnis server into the local Claude plugin cache.
+    Pull plugin skills from the remote Omnis server into the local Claude plugin cache.
 
 .DESCRIPTION
-    Fetches each agent's SKILL.md via the Omnis HTTP API and writes it to
-    ~/.claude/plugins/cache/omnis/<agent-id>/SKILL.md so Claude Code picks
-    it up automatically in every session.
+    Fetches each agent's cluster skills via the Omnis HTTP API and writes them to
+    ~/.claude/plugins/cache/omnis/<agent-id>/1.0.0/skills/<cluster>/SKILL.md
+    along with plugin.json, hooks/, and .mcp.json so Claude Code picks up the
+    full plugin automatically.
 
     Reads connection settings from environment variables or a local .env file:
         OMNIS_BASE_URL   https://omnis.yourdomain.com
@@ -23,11 +24,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# .env lives in the repo root, one level above this scripts/ directory
 $Root = Split-Path $PSScriptRoot -Parent
 
 # ---------------------------------------------------------------------------
-# Load .env (same pattern as Start-Dev.ps1 — existing vars take priority)
+# Load .env
 # ---------------------------------------------------------------------------
 $EnvFile = Join-Path $Root ".env"
 if (Test-Path $EnvFile) {
@@ -36,39 +36,32 @@ if (Test-Path $EnvFile) {
             $k = $Matches[1].Trim()
             $v = $Matches[2].Trim()
             if (-not [System.Environment]::GetEnvironmentVariable($k, "Process")) {
-                [System.Environment]::SetEnvironmentVariable($k, $v, "Process")
+                [System.Environment]::GetEnvironmentVariable($k, $v, "Process")
             }
         }
     }
 }
 
 # ---------------------------------------------------------------------------
-# Validate required settings
+# Validate settings
 # ---------------------------------------------------------------------------
 $BaseUrl  = ($env:OMNIS_BASE_URL  ?? "").TrimEnd("/")
 $User     = $env:OMNIS_USER     ?? ""
 $Password = $env:OMNIS_PASSWORD ?? ""
 
 if (-not $BaseUrl) {
-    Write-Host "ERROR: OMNIS_BASE_URL is not set. Add it to .env or your environment." -ForegroundColor Red
-    exit 1
+    Write-Host "ERROR: OMNIS_BASE_URL is not set." -ForegroundColor Red; exit 1
 }
 if (-not $User -or -not $Password) {
-    Write-Host "ERROR: OMNIS_USER and OMNIS_PASSWORD are required. Add them to .env or your environment." -ForegroundColor Red
-    exit 1
+    Write-Host "ERROR: OMNIS_USER and OMNIS_PASSWORD are required." -ForegroundColor Red; exit 1
 }
 
-# ---------------------------------------------------------------------------
-# Build Authorization header
-# ---------------------------------------------------------------------------
 $Bytes   = [System.Text.Encoding]::UTF8.GetBytes("${User}:${Password}")
 $B64     = [System.Convert]::ToBase64String($Bytes)
 $Headers = @{ Authorization = "Basic $B64" }
 
-# ---------------------------------------------------------------------------
-# Destination directory
-# ---------------------------------------------------------------------------
 $PluginCacheDir = Join-Path $HOME ".claude/plugins/cache/omnis"
+$PluginVersion  = "1.0.0"
 
 # ---------------------------------------------------------------------------
 # Fetch agent list
@@ -76,22 +69,16 @@ $PluginCacheDir = Join-Path $HOME ".claude/plugins/cache/omnis"
 Write-Host "Fetching agent list from $BaseUrl ..." -ForegroundColor Cyan
 
 try {
-    $AgentsResponse = Invoke-RestMethod -Uri "$BaseUrl/api/agents" -Headers $Headers -Method Get
+    $AgentList = @(Invoke-RestMethod -Uri "$BaseUrl/api/agents" -Headers $Headers -Method Get)
 } catch {
-    Write-Host "ERROR: Failed to fetch agents — $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    Write-Host "ERROR: Failed to fetch agents — $($_.Exception.Message)" -ForegroundColor Red; exit 1
 }
 
-# Wrap in @() to guarantee array semantics when the server returns a single agent
-$AgentList = @($AgentsResponse)
 if ($AgentList.Count -eq 0) {
-    Write-Host "No agents found on server." -ForegroundColor Yellow
-    exit 0
+    Write-Host "No agents found on server." -ForegroundColor Yellow; exit 0
 }
 
-$Updated = 0
-$Skipped = 0
-$Failed  = 0
+$Updated = 0; $Skipped = 0; $Failed = 0
 
 foreach ($Agent in $AgentList) {
     $AgentId = $Agent.agent_id
@@ -99,51 +86,100 @@ foreach ($Agent in $AgentList) {
 
     Write-Host "  [$AgentId]" -NoNewline
 
-    # Fetch SKILL.md content — 404 means consolidation hasn't run yet, not an error
+    # Fetch cluster skills
     try {
-        $SkillResponse = Invoke-RestMethod -Uri "$BaseUrl/api/knowledge/$AgentId/skill" -Headers $Headers -Method Get
+        $Skills = @(Invoke-RestMethod -Uri "$BaseUrl/api/knowledge/$AgentId/skills" -Headers $Headers -Method Get)
     } catch {
         $StatusCode = $_.Exception.Response?.StatusCode
         if ($StatusCode -eq 404) {
-            Write-Host " (no skill yet, skipping)" -ForegroundColor DarkGray
-            $Skipped++
+            Write-Host " (no skills yet, skipping)" -ForegroundColor DarkGray; $Skipped++
         } else {
-            Write-Host " FAILED — $($_.Exception.Message)" -ForegroundColor Red
-            $Failed++
+            Write-Host " FAILED — $($_.Exception.Message)" -ForegroundColor Red; $Failed++
         }
         continue
     }
 
-    $Content = $SkillResponse.content
-    if (-not $Content) {
-        Write-Host " (no skill content, skipping)" -ForegroundColor DarkGray
-        $Skipped++
+    if ($Skills.Count -eq 0) {
+        Write-Host " (no skills yet, skipping)" -ForegroundColor DarkGray; $Skipped++
         continue
     }
 
-    # Write to plugin cache
-    $DestDir  = Join-Path $PluginCacheDir $AgentId
-    $DestFile = Join-Path $DestDir "SKILL.md"
+    $InstallPath = Join-Path $PluginCacheDir "$AgentId/$PluginVersion"
 
     if ($DryRun) {
-        Write-Host " → $DestFile [DRY RUN]" -ForegroundColor DarkYellow
-        $Updated++
-        continue
+        Write-Host " → $InstallPath [DRY RUN, $($Skills.Count) skill(s)]" -ForegroundColor DarkYellow
+        $Updated++; continue
     }
 
-    if (-not (Test-Path $DestDir)) {
-        New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
+    # --- Cluster skills ---
+    $SkillsDir = Join-Path $InstallPath "skills"
+    # Clear stale clusters
+    if (Test-Path $SkillsDir) { Remove-Item $SkillsDir -Recurse -Force }
+
+    foreach ($Skill in $Skills) {
+        $ClusterDir = Join-Path $SkillsDir $Skill.name
+        New-Item -ItemType Directory -Path $ClusterDir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $ClusterDir "SKILL.md"), $Skill.content, [System.Text.Encoding]::UTF8)
     }
 
-    # Skip write if content is identical (use File IO to avoid BOM differences across PS versions)
-    if ((Test-Path $DestFile) -and ([System.IO.File]::ReadAllText($DestFile) -eq $Content)) {
-        Write-Host " (unchanged)" -ForegroundColor DarkGray
-        $Skipped++
-        continue
-    }
+    # --- plugin.json ---
+    $ManifestDir = Join-Path $InstallPath ".claude-plugin"
+    New-Item -ItemType Directory -Path $ManifestDir -Force | Out-Null
+    $PluginJson = @{
+        name        = "omnis-$AgentId"
+        version     = $PluginVersion
+        description = "Knowledge agent for $AgentId"
+        author      = "Omnis"
+        hooks       = "./hooks/hooks.json"
+        mcp         = "./.mcp.json"
+    } | ConvertTo-Json -Compress
+    [System.IO.File]::WriteAllText((Join-Path $ManifestDir "plugin.json"), $PluginJson, [System.Text.Encoding]::UTF8)
 
-    [System.IO.File]::WriteAllText($DestFile, $Content, [System.Text.Encoding]::UTF8)
-    Write-Host " → $DestFile" -ForegroundColor Green
+    # --- hooks ---
+    $HooksDir = Join-Path $InstallPath "hooks"
+    New-Item -ItemType Directory -Path $HooksDir -Force | Out-Null
+    $HooksJson = '{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"node \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-digest.js\""}]}]}'
+    [System.IO.File]::WriteAllText((Join-Path $HooksDir "hooks.json"), $HooksJson, [System.Text.Encoding]::UTF8)
+    $InjectJs = "const fs = require('fs'), path = require('path');`nconst f = path.join(process.env.CLAUDE_PLUGIN_ROOT, 'references', 'digest.md');`nif (fs.existsSync(f)) process.stdout.write(fs.readFileSync(f, 'utf8').split('`n').slice(0, 80).join('`n'));`n"
+    [System.IO.File]::WriteAllText((Join-Path $HooksDir "inject-digest.js"), $InjectJs, [System.Text.Encoding]::UTF8)
+
+    # --- .mcp.json ---
+    $McpJson = "{`"mcpServers`":{`"omnis-$AgentId`":{`"type`":`"sse`",`"url`":`"$BaseUrl/mcp`"}}}"
+    [System.IO.File]::WriteAllText((Join-Path $InstallPath ".mcp.json"), $McpJson, [System.Text.Encoding]::UTF8)
+
+    # --- digest (references) ---
+    try {
+        $DigestResp = Invoke-RestMethod -Uri "$BaseUrl/api/knowledge/$AgentId/digest" -Headers $Headers -Method Get
+        $RefsDir = Join-Path $InstallPath "references"
+        New-Item -ItemType Directory -Path $RefsDir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $RefsDir "digest.md"), $DigestResp.content, [System.Text.Encoding]::UTF8)
+    } catch { <# digest missing is non-fatal #> }
+
+    # --- Register in installed_plugins.json ---
+    $PluginsFile = Join-Path $HOME ".claude/plugins/installed_plugins.json"
+    $PluginKey   = "omnis@$AgentId"
+    $Now         = (Get-Date).ToUniversalTime().ToString("o")
+    if (Test-Path $PluginsFile) {
+        $PluginsData = Get-Content $PluginsFile -Raw | ConvertFrom-Json
+    } else {
+        New-Item -ItemType Directory -Path (Split-Path $PluginsFile) -Force | Out-Null
+        $PluginsData = [PSCustomObject]@{ version = 2; plugins = [PSCustomObject]@{} }
+    }
+    $Entry = [PSCustomObject]@{
+        scope       = "user"
+        installPath = $InstallPath -replace '\\', '/'
+        version     = $PluginVersion
+        installedAt = $Now
+        lastUpdated = $Now
+    }
+    if ($PluginsData.plugins.PSObject.Properties[$PluginKey]) {
+        $PluginsData.plugins.$PluginKey[0].lastUpdated = $Now
+    } else {
+        $PluginsData.plugins | Add-Member -NotePropertyName $PluginKey -NotePropertyValue @($Entry)
+    }
+    $PluginsData | ConvertTo-Json -Depth 10 | Set-Content $PluginsFile -Encoding UTF8
+
+    Write-Host " → $InstallPath ($($Skills.Count) skill(s))" -ForegroundColor Green
     $Updated++
 }
 

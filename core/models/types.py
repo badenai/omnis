@@ -101,3 +101,19 @@ class AgentConfig:
     self_improving: bool = True
     skill_eval: SkillEvalConfig = field(default_factory=SkillEvalConfig)
     paused: bool = False
+
+
+@dataclass
+class SkillSpec:
+    name: str               # kebab-case slug, e.g. "risk-management"
+    description: str        # "Use when..." ≤500 chars
+    file_pattern: str | None  # glob for PreToolUse injection, e.g. "**/*.py"
+    bash_pattern: str | None  # regex for bash injection, e.g. "pytest|coverage"
+    content: str            # full SKILL.md text including frontmatter
+
+
+@dataclass
+class PluginOutput:
+    agent_id: str
+    skills: list[SkillSpec]   # 2-5 topic skills + optional recent-news skill
+    session_hook_digest: str  # first ~2000 chars of digest for SessionStart hook

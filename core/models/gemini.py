@@ -328,6 +328,198 @@ class GeminiProvider:
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
+    def generate_plugin_skills(
+        self, digest: str, soul: str, agent_id: str,
+        learnings: str | None = None,
+        existing_clusters: list[str] | None = None,
+    ) -> "PluginOutput":
+        """Generate a full Claude Code plugin with 2-5 topic-clustered skills.
+
+        Two-phase approach:
+        1. Identify 2-5 topic clusters from the digest.
+        2. Generate a focused SKILL.md for each cluster.
+        """
+        from core.models.types import PluginOutput, SkillSpec
+        import re as _re
+
+        # --- Phase 1: Cluster identification ---
+        existing_hint = ""
+        if existing_clusters:
+            existing_hint = (
+                f"\n\nEXISTING CLUSTER NAMES from previous consolidation "
+                f"(reuse these exact slugs when the topic is still well-represented in the digest; "
+                f"only rename, add, or remove when the knowledge has genuinely shifted):\n"
+                + "\n".join(f"- {c}" for c in existing_clusters)
+                + "\n"
+            )
+
+        clustering_prompt = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"KNOWLEDGE DIGEST (first 4000 chars):\n{digest[:4000]}\n\n"
+            f"Identify 2-5 distinct topic clusters for separate Claude Code skill files. "
+            f"Each cluster should cover a clearly distinct domain or capability. "
+            f"Name clusters with kebab-case slugs."
+            f"{existing_hint}\n\n"
+            f"Respond with JSON only, no markdown fences:\n"
+            f'{{"clusters": [{{"name": "<kebab-case-slug>", "label": "<Human Readable>", '
+            f'"summary": "<2-3 sentences describing what this cluster covers>", '
+            f'"file_pattern": "<glob like **/*.py or null>", '
+            f'"bash_pattern": "<regex like pytest|unittest or null>"}}], '
+            f'"has_recent_news": true|false}}'
+        )
+
+        raw = self._generate(clustering_prompt, model=self._consolidation_model_name)
+        text = raw.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+
+        try:
+            cluster_data = json.loads(text)
+        except Exception:
+            cluster_data = {
+                "clusters": [{
+                    "name": agent_id,
+                    "label": agent_id.replace("-", " ").title(),
+                    "summary": soul[:200],
+                    "file_pattern": None,
+                    "bash_pattern": None,
+                }],
+                "has_recent_news": False,
+            }
+
+        clusters = cluster_data.get("clusters", [])[:5]
+        if not clusters:
+            clusters = [{
+                "name": agent_id,
+                "label": agent_id.replace("-", " ").title(),
+                "summary": soul[:200],
+                "file_pattern": None,
+                "bash_pattern": None,
+            }]
+        has_recent_news = cluster_data.get("has_recent_news", False)
+
+        # --- Phase 2: Per-cluster skill generation ---
+        skills = []
+        for cluster in clusters:
+            content = self._generate_cluster_skill(digest, soul, agent_id, cluster, learnings)
+
+            # Parse description from generated frontmatter
+            desc_match = _re.search(r'^description:\s*(.+)$', content, _re.MULTILINE)
+            description = desc_match.group(1).strip() if desc_match else ""
+
+            skills.append(SkillSpec(
+                name=cluster["name"],
+                description=description,
+                file_pattern=cluster.get("file_pattern"),
+                bash_pattern=cluster.get("bash_pattern"),
+                content=content,
+            ))
+
+        # Recent news skill (no patterns — news is always relevant)
+        if has_recent_news:
+            recent_match = _re.search(
+                r'## Recent Developments.*?(?=\n## |\Z)', digest, _re.DOTALL
+            )
+            if recent_match:
+                recent_section = recent_match.group(0)
+                recent_content = self._generate_recent_news_skill(recent_section, soul, agent_id)
+                skills.append(SkillSpec(
+                    name="recent-news",
+                    description=(
+                        "Use when asked about latest developments, recent news, current events, "
+                        "or recent updates in this domain."
+                    ),
+                    file_pattern=None,
+                    bash_pattern=None,
+                    content=recent_content,
+                ))
+
+        # Session hook digest: first ~2000 chars, truncated at paragraph boundary
+        hook_digest = digest[:2000]
+        last_para = hook_digest.rfind('\n\n')
+        if last_para > 500:
+            hook_digest = hook_digest[:last_para]
+
+        return PluginOutput(
+            agent_id=agent_id,
+            skills=skills,
+            session_hook_digest=hook_digest,
+        )
+
+    def _generate_cluster_skill(
+        self, digest: str, soul: str, agent_id: str, cluster: dict, learnings: str | None
+    ) -> str:
+        """Generate a focused SKILL.md for a single topic cluster."""
+        name = cluster["name"]
+        label = cluster["label"]
+        summary = cluster["summary"]
+        file_pattern = cluster.get("file_pattern")
+        bash_pattern = cluster.get("bash_pattern")
+
+        fp_line = f'   filePattern: "{file_pattern}"\n' if file_pattern else ""
+        bp_line = f'   bashPattern: "{bash_pattern}"\n' if bash_pattern else ""
+
+        contents = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"AGENT ID: {agent_id}\n"
+            f"CLUSTER FOCUS: {label} — {summary}\n\n"
+            f"You are writing a Claude Code SKILL.md file for a specific topic cluster.\n"
+            f"Focus ONLY on knowledge and behavioral rules relevant to: {label}\n\n"
+            f"Required sections:\n\n"
+            f"1. Raw YAML frontmatter at the very top — NOT in a code fence:\n"
+            f"   ---\n"
+            f"   name: {name}\n"
+            f"   description: <'Use when [specific trigger conditions for {label} only]' — under 500 chars>\n"
+            f"{fp_line}"
+            f"{bp_line}"
+            f"   ---\n\n"
+            f"2. ## The Iron Law\n"
+            f"   The single non-negotiable constraint for {label}, in a fenced code block.\n\n"
+            f"3. ## Behavioral Rules\n"
+            f"   Specific conditional rules for {label} domain.\n\n"
+            f"4. ## Red Flags\n"
+            f"   Domain-specific rationalizations | Why wrong table.\n\n"
+            f"5. ## Quick Reference\n"
+            f"   Compact table for {label}.\n\n"
+            f"Writing rules:\n"
+            f"- Only include rules relevant to '{label}' — ignore unrelated topics\n"
+            f"- Every sentence must be imperative or conditional, never descriptive\n"
+            f"- Concise and scannable\n"
+            f"- Trigger conditions belong in the description field only\n"
+            f"- Do NOT add 'Announce at start' lines or timestamp metadata\n\n"
+        )
+        if learnings:
+            contents += f"## Anti-Patterns to Avoid\n{learnings}\n\n"
+        contents += (
+            f"KNOWLEDGE DIGEST (extract behavioral rules ONLY for '{label}' — ignore unrelated sections):\n"
+            f"{digest}"
+        )
+        return self._generate(contents, model=self._consolidation_model_name)
+
+    def _generate_recent_news_skill(self, recent_section: str, soul: str, agent_id: str) -> str:
+        """Generate a recent-news skill from the Recent Developments section of the digest."""
+        contents = (
+            f"AGENT SOUL:\n{soul}\n\n"
+            f"AGENT ID: {agent_id}\n\n"
+            f"You are writing a Claude Code SKILL.md file for recent news and developments.\n\n"
+            f"Required sections:\n\n"
+            f"1. Raw YAML frontmatter at the very top — NOT in a code fence:\n"
+            f"   ---\n"
+            f"   name: recent-news\n"
+            f"   description: Use when asked about latest developments, recent news, or current events in this domain.\n"
+            f"   ---\n\n"
+            f"2. ## Recent Developments\n"
+            f"   Key recent findings and developments, most important first.\n\n"
+            f"3. ## Trending Now\n"
+            f"   Patterns and trends observed in recent content.\n\n"
+            f"Writing rules:\n"
+            f"- Focus on recency and currency of information\n"
+            f"- Be specific about what is new vs. established\n"
+            f"- Concise — this is a quick-reference, not a deep analysis\n\n"
+            f"RECENT DEVELOPMENTS SECTION:\n{recent_section}"
+        )
+        return self._generate(contents, model=self._consolidation_model_name)
+
     def consolidate(
         self, inbox_items: list[str], existing_index: str, soul: str
     ) -> ConsolidationResult:

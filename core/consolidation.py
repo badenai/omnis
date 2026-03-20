@@ -5,7 +5,7 @@ from core.constants import DATA_DIR
 from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
 from core.registry import Registry
-from core.skill_writer import SkillWriter
+from core.skill_writer import SkillWriter, PluginWriter
 from core.skill_quality import SkillQualityStore
 from core.state import AgentState
 from core.models.types import AgentConfig
@@ -83,18 +83,32 @@ class ConsolidationPipeline:
                 (self._dir / "digest.diff").write_text("".join(diff), encoding="utf-8")
             job_status.log(agent_id, task, f"digest.md written ({len(digest):,} chars)")
 
-            job_status.update_step(agent_id, task, "Generating SKILL.md...")
+            job_status.update_step(agent_id, task, "Generating plugin skills...")
             from core.skill_regression_analyzer import read_learnings
+            from core.constants import APP_NAME
             learnings = read_learnings(self._dir)
             if learnings:
                 job_status.log(agent_id, task, "Injecting regression learnings into skill generation…")
-            skill_content = self._provider.generate_skill(
-                digest, self._soul, self._config.agent_id, learnings=learnings
+            _skills_dir = (
+                pathlib.Path.home() / ".claude" / "plugins" / "cache"
+                / APP_NAME / self._config.agent_id / "1.0.0" / "skills"
             )
-            sw = SkillWriter(self._dir)
-            skill_changed = sw.write(skill_content, self._config.agent_id)
-            job_status.log(agent_id, task, "SKILL.md written")
-            alert = self._run_skill_eval_safely(skill_content)
+            existing_clusters = (
+                [d.name for d in _skills_dir.iterdir() if d.is_dir()]
+                if _skills_dir.exists() else []
+            )
+            plugin_output = self._provider.generate_plugin_skills(
+                digest, self._soul, self._config.agent_id,
+                learnings=learnings, existing_clusters=existing_clusters or None,
+            )
+            pw = PluginWriter(self._dir)
+            skill_changed = pw.write(plugin_output)
+            primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
+            job_status.log(
+                agent_id, task,
+                f"plugin written ({len(plugin_output.skills)} cluster skill(s))"
+            )
+            alert = self._run_skill_eval_safely(primary_skill_content)
             if alert:
                 self._run_skill_rollback_safely()
             self._run_structure_audit_safely()
@@ -180,13 +194,22 @@ class ConsolidationPipeline:
             digest = self._provider.generate_digest(knowledge_files, self._soul)
             (self._dir / "digest.md").write_text(digest, encoding="utf-8")
 
-            job_status.update_step(agent_id, task, "Generating SKILL.md...")
+            job_status.update_step(agent_id, task, "Generating plugin skills...")
             from core.skill_regression_analyzer import read_learnings
             learnings = read_learnings(self._dir)
-            skill_content = self._provider.generate_skill(digest, self._soul, self._config.agent_id, learnings=learnings)
-            sw = SkillWriter(self._dir)
-            sw.write(skill_content, self._config.agent_id)
-            self._run_skill_eval_safely(skill_content)
+            _skills_dir = self._dir / "skills"
+            existing_clusters = (
+                [d.name for d in _skills_dir.iterdir() if d.is_dir()]
+                if _skills_dir.exists() else []
+            )
+            plugin_output = self._provider.generate_plugin_skills(
+                digest, self._soul, self._config.agent_id,
+                learnings=learnings, existing_clusters=existing_clusters or None,
+            )
+            pw = PluginWriter(self._dir)
+            pw.write(plugin_output)
+            primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
+            self._run_skill_eval_safely(primary_skill_content)
             self._run_structure_audit_safely()
 
             reg = Registry(DATA_DIR / "registry.json")
@@ -280,24 +303,18 @@ class ConsolidationPipeline:
 
     def _run_structure_audit_safely(self) -> None:
         """Run SKILL.md structure audit after consolidation; swallow errors."""
-        from core.constants import APP_NAME
         from core.description_optimizer import run_structure_audit
         agent_id = self._config.agent_id
         task = job_status.get_current()[1] if job_status.get_current() else "consolidation"
-        skill_dir = (
-            pathlib.Path.home()
-            / ".claude" / "plugins" / "cache"
-            / APP_NAME / APP_NAME / "1.0.0"
-            / "skills" / agent_id
-        )
-        if not skill_dir.exists():
+        skill_path = self._dir / "SKILL.md"
+        if not skill_path.exists():
             return
         try:
             job_status.update_step(agent_id, task, "Auditing SKILL.md structure…")
             run_structure_audit(
                 agent_dir=self._dir,
                 agent_id=agent_id,
-                skill_dir=skill_dir,
+                skill_path=skill_path,
                 provider=self._provider,
                 job_log_fn=job_status.log,
             )

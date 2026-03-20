@@ -138,3 +138,11 @@ export interface KnowledgeFile {
 export interface KnowledgeFileContent extends KnowledgeFile {
   content: string;
 }
+
+export interface PluginSkill {
+  name: string;
+  description: string;
+  file_pattern: string | null;
+  bash_pattern: string | null;
+  content: string;
+}

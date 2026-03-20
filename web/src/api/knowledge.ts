@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { KnowledgeFile, KnowledgeFileContent, QualityHistory, SkillAudit } from '../types';
+import type { KnowledgeFile, KnowledgeFileContent, QualityHistory, SkillAudit, PluginSkill } from '../types';
 
 export function useKnowledge(agentId: string) {
   return useQuery({
@@ -94,6 +94,15 @@ export function useSkillAudit(agentId: string) {
     retry: false,
     staleTime: 0,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useSkills(agentId: string) {
+  return useQuery<PluginSkill[]>({
+    queryKey: ['knowledge', agentId, 'skills'],
+    queryFn: () => apiFetch<PluginSkill[]>(`/knowledge/${agentId}/skills`),
+    enabled: !!agentId,
+    retry: false,
   });
 }
 

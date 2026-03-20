@@ -162,7 +162,7 @@ If no issues, return {{"overall_score": 100, "issues": [], "summary": "<positive
 def run_structure_audit(
     agent_dir: pathlib.Path,
     agent_id: str,
-    skill_dir: pathlib.Path,
+    skill_path: pathlib.Path,
     provider,
     job_log_fn,
 ) -> dict | None:
@@ -175,7 +175,6 @@ def run_structure_audit(
     """
     task = "audit-structure"
 
-    skill_path = skill_dir / "SKILL.md"
     if not skill_path.exists():
         job_log_fn(agent_id, task, f"SKILL.md not found at {skill_path} — run consolidation first")
         return None
@@ -218,7 +217,7 @@ def run_structure_audit(
 def apply_structure_fixes(
     agent_dir: pathlib.Path,
     agent_id: str,
-    skill_dir: pathlib.Path,
+    skill_path: pathlib.Path,
     provider,
     job_log_fn,
 ) -> bool:
@@ -240,7 +239,6 @@ def apply_structure_fixes(
         job_log_fn(agent_id, task, "No issues to fix — skipping rewrite")
         return True
 
-    skill_path = skill_dir / "SKILL.md"
     if not skill_path.exists():
         return False
 
@@ -279,24 +277,25 @@ def apply_structure_fixes(
         job_log_fn(agent_id, task, "Rewrite returned invalid content (no frontmatter) — skipping")
         return False
 
-    # Write plugin cache copy (no backup here — backups belong in agent_dir only)
+    # Write backup then update agent-dir copy
+    if skill_path.exists():
+        (agent_dir / "SKILL.previous.md").write_text(
+            skill_path.read_text(encoding="utf-8"), encoding="utf-8"
+        )
     skill_path.write_text(new_content, encoding="utf-8")
 
-    # Re-copy references so the plugin cache stays consistent
-    import shutil
-    refs_dir = skill_dir / "references"
-    refs_dir.mkdir(exist_ok=True)
-    digest_src = agent_dir / "digest.md"
-    if digest_src.exists():
-        shutil.copy2(digest_src, refs_dir / "digest.md")
-
-    # Write agent-dir copy with backup
-    agent_skill = agent_dir / "SKILL.md"
-    if agent_skill.exists():
-        (agent_dir / "SKILL.previous.md").write_text(
-            agent_skill.read_text(encoding="utf-8"), encoding="utf-8"
-        )
-    agent_skill.write_text(new_content, encoding="utf-8")
+    # Mirror to agent_dir/skills/{primary} and plugin cache
+    primary_path_file = agent_dir / "primary_skill_path.txt"
+    if primary_path_file.exists():
+        primary_agent_path = pathlib.Path(primary_path_file.read_text("utf-8").strip())
+        primary_agent_path.write_text(new_content, encoding="utf-8")
+        cluster_name = primary_agent_path.parent.name
+        install_path_file = agent_dir / "plugin_install_path.txt"
+        if install_path_file.exists():
+            install_path = pathlib.Path(install_path_file.read_text("utf-8").strip())
+            plugin_cache_path = install_path / "skills" / cluster_name / "SKILL.md"
+            if plugin_cache_path.parent.exists():
+                plugin_cache_path.write_text(new_content, encoding="utf-8")
 
     job_log_fn(agent_id, task, "Rewrite applied — SKILL.previous.md saved as backup in agent dir")
     return True
@@ -309,7 +308,7 @@ def apply_structure_fixes(
 def run_description_optimization(
     agent_dir: pathlib.Path,
     agent_id: str,
-    skill_dir: pathlib.Path,
+    skill_path: pathlib.Path,
     soul: str,
     provider,
     job_log_fn,
@@ -318,12 +317,11 @@ def run_description_optimization(
     """Optimize the SKILL.md description field using a native Gemini loop.
 
     Iteratively scores and rewrites the description against a 20-query eval set.
-    Updates both skill_dir/SKILL.md and agent_dir/SKILL.md on improvement.
+    Updates skill_path (agent_dir/SKILL.md) and the plugin cache primary skill on improvement.
     Returns the best description found, or None on failure.
     """
     task = "optimize-description"
 
-    skill_path = skill_dir / "SKILL.md"
     if not skill_path.exists():
         job_log_fn(agent_id, task, f"SKILL.md not found at {skill_path} — run consolidation first")
         return None
@@ -417,11 +415,25 @@ def run_description_optimization(
             return True
         return False
 
-    changed_plugin = _apply(skill_path)
-    changed_agent = _apply(agent_dir / "SKILL.md")
+    changed_agent = _apply(skill_path)
+
+    # Mirror to agent_dir/skills/{primary} and plugin cache
+    changed_agent_skills = False
+    primary_path_file = agent_dir / "primary_skill_path.txt"
+    if primary_path_file.exists():
+        primary_agent_path = pathlib.Path(primary_path_file.read_text("utf-8").strip())
+        changed_agent_skills = _apply(primary_agent_path)
+        if changed_agent_skills:
+            cluster_name = primary_agent_path.parent.name
+            install_path_file = agent_dir / "plugin_install_path.txt"
+            if install_path_file.exists():
+                install_path = pathlib.Path(install_path_file.read_text("utf-8").strip())
+                plugin_cache_path = install_path / "skills" / cluster_name / "SKILL.md"
+                if plugin_cache_path.parent.exists():
+                    _apply(plugin_cache_path)
 
     job_log_fn(
         agent_id, task,
-        f"Updated SKILL.md (plugin_dir={changed_plugin}, agent_dir={changed_agent})"
+        f"Updated SKILL.md (agent_dir={changed_agent}, agent_skills={changed_agent_skills})"
     )
     return best_description

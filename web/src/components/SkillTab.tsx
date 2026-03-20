@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { useSkill, useSkillQuality, useSkillAudit, useSkillDiff, useRollbackSkill } from '../api/knowledge';
+import { useSkill, useSkillQuality, useSkillAudit, useSkillDiff, useRollbackSkill, useSkills } from '../api/knowledge';
 import { useTriggerAuditSkill, useActivityStream } from '../api/scheduler';
 import type { StructureIssue, QualityHistoryEntry } from '../types';
 
@@ -467,14 +467,21 @@ export default function SkillTab({ agentId }: Props) {
   const [view, setView] = useState<'content' | 'diff'>('content');
   const [auditError, setAuditError] = useState<string | null>(null);
   const [rollbackError, setRollbackError] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<'primary' | string>('primary');
   const { data: skillData } = useSkill(agentId);
   const { data: diffData } = useSkillDiff(agentId);
+  const { data: pluginSkills } = useSkills(agentId);
   const triggerAudit = useTriggerAuditSkill(agentId);
   const rollback = useRollbackSkill(agentId);
   const { active } = useActivityStream();
   const qc = useQueryClient();
   const isJobRunning = active.some(j => j.agent_id === agentId && j.task === 'audit-skill');
   const isRollbackRunning = active.some(j => j.agent_id === agentId && j.task === 'rollback');
+
+  const showTabs = pluginSkills && pluginSkills.length > 1;
+  const activeClusterSkill = showTabs && selectedTab !== 'primary'
+    ? pluginSkills.find(s => s.name === selectedTab)
+    : null;
 
   // Invalidate audit + skill data when the audit-skill or rollback job for this agent completes
   const prevActiveKeys = useRef<string[]>([]);
@@ -511,6 +518,91 @@ export default function SkillTab({ agentId }: Props) {
     });
   }
 
+  // Cluster skill read-only view
+  if (activeClusterSkill) {
+    const clusterLabel = activeClusterSkill.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return (
+      <div style={{ display: 'flex', height: '100%', overflow: 'hidden', flexDirection: 'column' }}>
+        {/* Tab bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0,
+          borderBottom: '1px solid var(--color-border-subtle)',
+          backgroundColor: 'var(--color-surface-1)', overflowX: 'auto',
+        }}>
+          <button
+            onClick={() => setSelectedTab('primary')}
+            style={{
+              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
+              border: 'none', borderBottom: '2px solid transparent',
+              cursor: 'pointer', background: 'transparent',
+              color: 'var(--color-text-muted)', transition: 'color 120ms',
+              flexShrink: 0,
+            }}
+          >
+            Primary
+          </button>
+          {pluginSkills!.map(ps => {
+            const label = ps.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const isActive = ps.name === selectedTab;
+            return (
+              <button
+                key={ps.name}
+                onClick={() => setSelectedTab(ps.name)}
+                style={{
+                  padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                  border: 'none', borderBottom: `2px solid ${isActive ? 'var(--color-accent)' : 'transparent'}`,
+                  cursor: 'pointer', background: 'transparent',
+                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                  fontWeight: isActive ? 600 : 400, transition: 'color 120ms',
+                  flexShrink: 0,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Cluster skill header */}
+        <div style={{
+          padding: '8px 20px', flexShrink: 0,
+          borderBottom: '1px solid var(--color-border-subtle)',
+          backgroundColor: 'var(--color-surface-1)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>
+            {clusterLabel}
+          </span>
+          {activeClusterSkill.file_pattern && (
+            <span style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)', flexShrink: 0,
+              color: 'rgba(139,92,246,0.8)', backgroundColor: 'rgba(139,92,246,0.08)',
+              padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(139,92,246,0.2)',
+            }}>
+              {activeClusterSkill.file_pattern}
+            </span>
+          )}
+          {activeClusterSkill.bash_pattern && (
+            <span style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)', flexShrink: 0,
+              color: 'rgba(34,197,94,0.8)', backgroundColor: 'rgba(34,197,94,0.06)',
+              padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(34,197,94,0.2)',
+            }}>
+              /{activeClusterSkill.bash_pattern}/
+            </span>
+          )}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+          <div className="prose prose-invert prose-sm max-w-none prose-headings:text-gray-100 prose-p:text-gray-300 prose-strong:text-gray-100 prose-code:text-indigo-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700 prose-table:text-sm prose-th:text-gray-300 prose-td:text-gray-400 prose-a:text-indigo-400 prose-li:text-gray-300 prose-blockquote:border-indigo-500 prose-blockquote:text-gray-400 prose-hr:border-gray-700">
+            <Markdown remarkPlugins={[remarkGfm]}>{activeClusterSkill.content}</Markdown>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left: gauges + issues */}
@@ -527,6 +619,44 @@ export default function SkillTab({ agentId }: Props) {
 
       {/* Right: content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        {/* Tab bar (only when multiple cluster skills available) */}
+        {showTabs && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0,
+            borderBottom: '1px solid var(--color-border-subtle)',
+            backgroundColor: 'var(--color-surface-1)', overflowX: 'auto',
+          }}>
+            <button
+              onClick={() => setSelectedTab('primary')}
+              style={{
+                padding: '6px 14px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                border: 'none', borderBottom: '2px solid var(--color-accent)',
+                cursor: 'pointer', background: 'transparent',
+                color: 'var(--color-accent)', fontWeight: 600, flexShrink: 0,
+              }}
+            >
+              Primary
+            </button>
+            {pluginSkills!.map(ps => {
+              const label = ps.name.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              return (
+                <button
+                  key={ps.name}
+                  onClick={() => setSelectedTab(ps.name)}
+                  style={{
+                    padding: '6px 14px', fontSize: 11, fontFamily: 'var(--font-mono)',
+                    border: 'none', borderBottom: '2px solid transparent',
+                    cursor: 'pointer', background: 'transparent',
+                    color: 'var(--color-text-muted)', transition: 'color 120ms', flexShrink: 0,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Content toolbar */}
         <div style={{
           display: 'flex',
