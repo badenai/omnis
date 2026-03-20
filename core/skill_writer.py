@@ -127,17 +127,20 @@ class SkillWriter:
         current_path.write_text(previous_content, "utf-8")
 
         # Mirror to agent_dir/skills/{primary} and plugin cache.
-        primary_path_file = self._agent_dir / "primary_skill_path.txt"
-        if primary_path_file.exists():
-            primary_agent_path = pathlib.Path(primary_path_file.read_text("utf-8").strip())
+        skills_dir = self._agent_dir / "skills"
+        cluster_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.exists() else []
+        if cluster_dirs:
+            primary_agent_path = cluster_dirs[0] / "SKILL.md"
             primary_agent_path.parent.mkdir(parents=True, exist_ok=True)
             primary_agent_path.write_text(previous_content, "utf-8")
-            # Mirror to plugin cache via plugin_install_path.txt
-            install_path_file = self._agent_dir / "plugin_install_path.txt"
-            if install_path_file.exists():
-                install_path = pathlib.Path(install_path_file.read_text("utf-8").strip())
-                cluster_name = primary_agent_path.parent.name
-                plugin_cache_path = install_path / "skills" / cluster_name / "SKILL.md"
+            version_file = self._agent_dir / "plugin_version.txt"
+            if version_file.exists():
+                version = version_file.read_text("utf-8").strip()
+                install_path = (
+                    pathlib.Path.home() / ".claude" / "plugins" / "cache"
+                    / APP_NAME / agent_id / version
+                )
+                plugin_cache_path = install_path / "skills" / cluster_dirs[0].name / "SKILL.md"
                 if plugin_cache_path.parent.exists():
                     plugin_cache_path.write_text(previous_content, "utf-8")
 
@@ -284,12 +287,6 @@ class PluginWriter:
         if digest_src.exists():
             shutil.copy2(digest_src, refs_dir / "digest.md")
 
-        # --- primary_skill_path.txt → agent_dir/skills/{primary}/SKILL.md ---
-        if plugin_output.skills:
-            primary_agent_path = agent_skills_dir / plugin_output.skills[0].name / "SKILL.md"
-            (self._agent_dir / "primary_skill_path.txt").write_text(
-                str(primary_agent_path), encoding="utf-8"
-            )
 
         # --- Agent definition ---
         self._write_agent_file(agent_id, install_path)
@@ -299,9 +296,6 @@ class PluginWriter:
 
         # --- Track current version and install path ---
         version_file.write_text(version, encoding="utf-8")
-        (self._agent_dir / "plugin_install_path.txt").write_text(
-            str(install_path), encoding="utf-8"
-        )
 
         # --- Register plugin ---
         plugin_key = f"{APP_NAME}@{agent_id}"

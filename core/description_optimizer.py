@@ -9,6 +9,7 @@ import pathlib
 import re
 
 from core import job_status
+from core.constants import APP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -285,15 +286,18 @@ def apply_structure_fixes(
     skill_path.write_text(new_content, encoding="utf-8")
 
     # Mirror to agent_dir/skills/{primary} and plugin cache
-    primary_path_file = agent_dir / "primary_skill_path.txt"
-    if primary_path_file.exists():
-        primary_agent_path = pathlib.Path(primary_path_file.read_text("utf-8").strip())
-        primary_agent_path.write_text(new_content, encoding="utf-8")
-        cluster_name = primary_agent_path.parent.name
-        install_path_file = agent_dir / "plugin_install_path.txt"
-        if install_path_file.exists():
-            install_path = pathlib.Path(install_path_file.read_text("utf-8").strip())
-            plugin_cache_path = install_path / "skills" / cluster_name / "SKILL.md"
+    skills_dir = agent_dir / "skills"
+    cluster_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.exists() else []
+    if cluster_dirs:
+        (cluster_dirs[0] / "SKILL.md").write_text(new_content, encoding="utf-8")
+        version_file = agent_dir / "plugin_version.txt"
+        if version_file.exists():
+            version = version_file.read_text("utf-8").strip()
+            install_path = (
+                pathlib.Path.home() / ".claude" / "plugins" / "cache"
+                / APP_NAME / agent_id / version
+            )
+            plugin_cache_path = install_path / "skills" / cluster_dirs[0].name / "SKILL.md"
             if plugin_cache_path.parent.exists():
                 plugin_cache_path.write_text(new_content, encoding="utf-8")
 
@@ -419,16 +423,19 @@ def run_description_optimization(
 
     # Mirror to agent_dir/skills/{primary} and plugin cache
     changed_agent_skills = False
-    primary_path_file = agent_dir / "primary_skill_path.txt"
-    if primary_path_file.exists():
-        primary_agent_path = pathlib.Path(primary_path_file.read_text("utf-8").strip())
-        changed_agent_skills = _apply(primary_agent_path)
+    skills_dir = agent_dir / "skills"
+    cluster_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.exists() else []
+    if cluster_dirs:
+        changed_agent_skills = _apply(cluster_dirs[0] / "SKILL.md")
         if changed_agent_skills:
-            cluster_name = primary_agent_path.parent.name
-            install_path_file = agent_dir / "plugin_install_path.txt"
-            if install_path_file.exists():
-                install_path = pathlib.Path(install_path_file.read_text("utf-8").strip())
-                plugin_cache_path = install_path / "skills" / cluster_name / "SKILL.md"
+            version_file = agent_dir / "plugin_version.txt"
+            if version_file.exists():
+                version = version_file.read_text("utf-8").strip()
+                install_path = (
+                    pathlib.Path.home() / ".claude" / "plugins" / "cache"
+                    / APP_NAME / agent_id / version
+                )
+                plugin_cache_path = install_path / "skills" / cluster_dirs[0].name / "SKILL.md"
                 if plugin_cache_path.parent.exists():
                     _apply(plugin_cache_path)
 
