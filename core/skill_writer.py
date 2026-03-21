@@ -1,17 +1,12 @@
 import difflib
-import json
 import pathlib
 import re
 import shutil
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from core.constants import APP_NAME, PLUGIN_VERSION
 
 if TYPE_CHECKING:
     from core.models.types import PluginOutput
-
-_PLUGIN_KEY = f"{APP_NAME}@{APP_NAME}"
 
 
 def _sanitize_structure(content: str) -> str:
@@ -67,25 +62,6 @@ class SkillWriter:
 
         local.write_text(skill_content, encoding="utf-8")
 
-        # Global copy in the Claude Code plugin cache
-        install_path = (
-            pathlib.Path.home()
-            / ".claude" / "plugins" / "cache"
-            / APP_NAME / APP_NAME / PLUGIN_VERSION
-        )
-        skill_dir = install_path / "skills" / agent_id
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
-
-        # Bundle reference files for progressive disclosure
-        refs_dir = skill_dir / "references"
-        refs_dir.mkdir(exist_ok=True)
-        digest_src = self._agent_dir / "digest.md"
-        if digest_src.exists():
-            shutil.copy2(digest_src, refs_dir / "digest.md")
-
-        self._register_plugin(install_path)
-
         # Compute diff
         if previous_content is None:
             changed = True  # first run, nothing to diff
@@ -108,8 +84,7 @@ class SkillWriter:
         """Revert SKILL.md to its previous version.
 
         Saves the current (rejected) skill to SKILL.rejected.md for analysis,
-        then restores SKILL.previous.md as the active skill in both the agent
-        directory and the plugin cache.
+        then restores SKILL.previous.md as the active skill in the agent directory.
 
         Returns True on success, False if SKILL.previous.md does not exist.
         """
@@ -126,54 +101,15 @@ class SkillWriter:
         previous_content = previous_path.read_text("utf-8")
         current_path.write_text(previous_content, "utf-8")
 
-        # Mirror to agent_dir/skills/{primary} and plugin cache.
+        # Mirror to agent_dir/skills/{primary}.
         skills_dir = self._agent_dir / "skills"
         cluster_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.exists() else []
         if cluster_dirs:
             primary_agent_path = cluster_dirs[0] / "SKILL.md"
             primary_agent_path.parent.mkdir(parents=True, exist_ok=True)
             primary_agent_path.write_text(previous_content, "utf-8")
-            version_file = self._agent_dir / "plugin_version.txt"
-            if version_file.exists():
-                version = version_file.read_text("utf-8").strip()
-                install_path = (
-                    pathlib.Path.home() / ".claude" / "plugins" / "cache"
-                    / APP_NAME / agent_id / version
-                )
-                plugin_cache_path = install_path / "skills" / cluster_dirs[0].name / "SKILL.md"
-                if plugin_cache_path.parent.exists():
-                    plugin_cache_path.write_text(previous_content, "utf-8")
 
         return True
-
-    def _register_plugin(self, install_path: pathlib.Path) -> None:
-        plugins_file = (
-            pathlib.Path.home() / ".claude" / "plugins" / "installed_plugins.json"
-        )
-        plugins_file.parent.mkdir(parents=True, exist_ok=True)
-
-        if plugins_file.exists():
-            data = json.loads(plugins_file.read_text(encoding="utf-8"))
-        else:
-            data = {"version": 2, "plugins": {}}
-
-        now = datetime.now(timezone.utc).isoformat()
-        install_path_str = str(install_path)
-
-        if _PLUGIN_KEY in data["plugins"]:
-            data["plugins"][_PLUGIN_KEY][0]["lastUpdated"] = now
-        else:
-            data["plugins"][_PLUGIN_KEY] = [
-                {
-                    "scope": "user",
-                    "installPath": install_path_str,
-                    "version": PLUGIN_VERSION,
-                    "installedAt": now,
-                    "lastUpdated": now,
-                }
-            ]
-
-        plugins_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 class PluginWriter:

@@ -82,3 +82,34 @@ def test_plugin_writer_does_not_create_installed_plugins(tmp_path):
         pw.write(output)
     installed = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
     assert not installed.exists()
+
+
+def test_skill_writer_does_not_write_to_claude_cache(tmp_path):
+    from core.skill_writer import SkillWriter
+    agent_dir = tmp_path / "agents" / "trading"
+    agent_dir.mkdir(parents=True)
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        sw = SkillWriter(agent_dir)
+        sw.write("# Skill", agent_id="trading")
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    assert not cache.exists()
+
+
+def test_skill_writer_revert_does_not_write_to_claude_cache(tmp_path):
+    from core.skill_writer import SkillWriter
+    agent_dir = tmp_path / "agents" / "trading"
+    agent_dir.mkdir(parents=True)
+    # Set up a previous skill and a skills dir (needed for revert)
+    (agent_dir / "SKILL.md").write_text("# Current")
+    (agent_dir / "SKILL.previous.md").write_text("# Previous")
+    skills_dir = agent_dir / "skills" / "main"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("# Cluster skill")
+    (agent_dir / "plugin_version.txt").write_text("3")
+
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        sw = SkillWriter(agent_dir)
+        sw.revert_to_previous("trading")
+
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    assert not cache.exists()
