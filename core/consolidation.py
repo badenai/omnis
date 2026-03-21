@@ -392,20 +392,22 @@ class ConsolidationPipeline:
 
             job_status.update_step(agent_id, task, f"Soul autopilot: testing {len(individual)} suggestion(s) one by one…")
 
+            # Compute baseline answers once — reused across all suggestion evaluations
+            job_status.log(agent_id, task, "Soul autopilot: computing shared baseline answers…")
+            bare_answers = self._provider.compute_bare_answers(eval_cfg.prompts)
+
             for i, suggestion in enumerate(individual):
                 label = f"[{i + 1}/{len(individual)}]"
-                job_status.log(agent_id, task, f"Soul autopilot {label}: integrating suggestion…")
+                job_status.log(agent_id, task, f"Soul autopilot {label}: integrating + generating SKILL.md…")
 
-                candidate_soul = self._provider.integrate_soul_suggestions(current_soul, [suggestion])
-
-                job_status.log(agent_id, task, f"Soul autopilot {label}: generating candidate SKILL.md…")
-                candidate_skill = self._provider.generate_skill(
-                    digest, candidate_soul, agent_id, learnings=learnings
+                candidate_soul, candidate_skill = self._provider.integrate_and_generate_skill(
+                    current_soul, suggestion, digest, agent_id, learnings=learnings
                 )
 
                 job_status.log(agent_id, task, f"Soul autopilot {label}: evaluating…")
                 candidate_result = self._provider.evaluate_skill(
-                    candidate_skill, eval_cfg.prompts, candidate_soul
+                    candidate_skill, eval_cfg.prompts, candidate_soul,
+                    bare_answers=bare_answers,
                 )
                 candidate_score = candidate_result.score
 
