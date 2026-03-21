@@ -4,8 +4,6 @@ from unittest.mock import patch
 from core.skill_writer import SkillWriter
 from core.registry import Registry
 
-PLUGIN_VERSION = "1.0.0"
-
 
 def test_write_skill_creates_file_in_agent_dir(tmp_path):
     agent_dir = tmp_path / "agents" / "trading"
