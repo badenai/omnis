@@ -88,14 +88,10 @@ class ConsolidationPipeline:
             learnings = read_learnings(self._dir)
             if learnings:
                 job_status.log(agent_id, task, "Injecting regression learnings into skill generation…")
-            _skills_dir = (
-                pathlib.Path.home() / ".claude" / "plugins" / "cache"
-                / APP_NAME / self._config.agent_id / "1.0.0" / "skills"
-            )
-            existing_clusters = (
-                [d.name for d in _skills_dir.iterdir() if d.is_dir()]
-                if _skills_dir.exists() else []
-            )
+            existing_clusters = [
+                d.name for d in (self._dir / "skills").iterdir()
+                if d.is_dir()
+            ] if (self._dir / "skills").exists() else []
             plugin_output = self._provider.generate_plugin_skills(
                 digest, self._soul, self._config.agent_id,
                 learnings=learnings, existing_clusters=existing_clusters or None,

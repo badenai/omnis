@@ -203,4 +203,4 @@ def test_publish_calls_regenerate_marketplace(tmp_path):
          patch.object(pub, "_regenerate_marketplace") as mock_regen:
         pub.publish(agent_id, agent_dir, version="5")
 
-    mock_regen.assert_called_once_with("my-agent", "5", pub._extract_description(agent_dir))
+    mock_regen.assert_called_once_with("my-agent", "5", "Focus here.")

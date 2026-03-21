@@ -9,7 +9,7 @@
 #   "owner": {"name": "Omnis"},
 #   "plugins": [
 #     {
-#       "name": "omnis-<agent-id>",
+#       "name": "<agent-id>",
 #       "description": "<from SOUL.md>",
 #       "version": "<version string>",
 #       "author": {"name": "Omnis"},
