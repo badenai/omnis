@@ -151,7 +151,7 @@ class GitHubPublisher:
         if get_resp.status_code == 200:
             raw = base64.b64decode(get_resp.json()["content"]).decode("utf-8")
             marketplace = json.loads(raw)
-        else:
+        elif get_resp.status_code == 404:
             marketplace = {
                 "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
                 "name": "omnis",
@@ -159,6 +159,10 @@ class GitHubPublisher:
                 "owner": {"name": "Omnis"},
                 "plugins": [],
             }
+        else:
+            get_resp.raise_for_status()
+
+        marketplace.setdefault("$schema", "https://anthropic.com/claude-code/marketplace.schema.json")
 
         entry = {
             "name": agent_id,
