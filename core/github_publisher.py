@@ -61,7 +61,18 @@ class GitHubPublisher:
         return cls(token=token, repo=repo, branch=branch)
 
     def publish(self, agent_id: str, agent_dir: pathlib.Path, version: str) -> None:
-        raise NotImplementedError
+        """Push plugin snapshot for one agent and update marketplace.json."""
+        if not plugin_output_exists(agent_dir):
+            logger.info("[%s] No skills to publish — skipping GitHub push", agent_id)
+            return
+
+        files = self._collect_files(agent_id, agent_dir)
+        for path, content in files.items():
+            logger.debug("Upserting %s", path)
+            self._upsert_file(path, content)
+
+        description = self._extract_description(agent_dir)
+        self._regenerate_marketplace(agent_id, version, description)
 
     def _collect_files(self, agent_id: str, agent_dir: pathlib.Path) -> dict[str, str]:
         """Return {github_path: utf-8 content} for all files to publish."""
@@ -133,7 +144,45 @@ class GitHubPublisher:
         put_resp.raise_for_status()
 
     def _regenerate_marketplace(self, agent_id: str, version: str, description: str) -> None:
-        raise NotImplementedError
+        """Merge-update marketplace.json at repo root."""
+        url = f"{self.BASE_URL}/repos/{self._repo}/contents/marketplace.json"
+        get_resp = self._client.get(url, params={"ref": self._branch})
+
+        if get_resp.status_code == 200:
+            raw = base64.b64decode(get_resp.json()["content"]).decode("utf-8")
+            marketplace = json.loads(raw)
+        else:
+            marketplace = {
+                "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+                "name": "omnis",
+                "description": "Omnis knowledge agents",
+                "owner": {"name": "Omnis"},
+                "plugins": [],
+            }
+
+        entry = {
+            "name": agent_id,
+            "description": description,
+            "version": version,
+            "author": {"name": "Omnis"},
+            "category": "productivity",
+            "source": {
+                "source": "git-subdir",
+                "url": f"https://github.com/{self._repo}.git",
+                "path": f"agents/{agent_id}",
+                "ref": self._branch,
+            },
+        }
+
+        plugins = marketplace.setdefault("plugins", [])
+        for i, p in enumerate(plugins):
+            if p.get("name") == agent_id:
+                plugins[i] = entry
+                break
+        else:
+            plugins.append(entry)
+
+        self._upsert_file("marketplace.json", json.dumps(marketplace, indent=2))
 
     def _extract_description(self, agent_dir: pathlib.Path) -> str:
         """Read SOUL.md, return first non-blank, non-heading line, stripped of bold/italic markers,
@@ -153,3 +202,11 @@ class GitHubPublisher:
             cleaned = re.sub(r"_(.*?)_", r"\1", cleaned)
             return cleaned[:200]
         return ""
+
+
+def plugin_output_exists(agent_dir: pathlib.Path) -> bool:
+    """True if the agent dir has at least one cluster skill to publish."""
+    skills_dir = agent_dir / "skills"
+    return skills_dir.exists() and any(
+        (d / "SKILL.md").exists() for d in skills_dir.iterdir() if d.is_dir()
+    )

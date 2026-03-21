@@ -134,3 +134,73 @@ def test_upsert_file_updates_existing_file_with_sha(tmp_path):
 
     call_body = mock_put.call_args[1]["json"]
     assert call_body["sha"] == "abc123"
+
+
+def test_regenerate_marketplace_creates_new_when_missing(tmp_path):
+    pub = _make_publisher()
+    mock_get = MagicMock()
+    mock_get.status_code = 404
+
+    with patch.object(pub._client, "get", return_value=mock_get), \
+         patch.object(pub, "_upsert_file") as mock_upsert:
+        pub._regenerate_marketplace("my-agent", "2", "Focus here.")
+
+    assert mock_upsert.called
+    written = json.loads(mock_upsert.call_args[0][1])
+    plugin = next(p for p in written["plugins"] if p["name"] == "my-agent")
+    assert plugin["version"] == "2"
+    assert plugin["description"] == "Focus here."
+
+
+def test_regenerate_marketplace_upserts_existing_entry(tmp_path):
+    pub = _make_publisher()
+    existing = {
+        "name": "omnis",
+        "plugins": [
+            {"name": "other-agent", "version": "1", "description": "other"},
+            {"name": "my-agent", "version": "1", "description": "old"},
+        ]
+    }
+    encoded = base64.b64encode(json.dumps(existing).encode()).decode()
+
+    mock_get = MagicMock()
+    mock_get.status_code = 200
+    mock_get.json.return_value = {"sha": "oldsha", "content": encoded}
+
+    with patch.object(pub._client, "get", return_value=mock_get), \
+         patch.object(pub, "_upsert_file") as mock_upsert:
+        pub._regenerate_marketplace("my-agent", "3", "new desc")
+
+    written = json.loads(mock_upsert.call_args[0][1])
+    # other-agent preserved, my-agent updated
+    assert len(written["plugins"]) == 2
+    my = next(p for p in written["plugins"] if p["name"] == "my-agent")
+    assert my["version"] == "3"
+    assert my["description"] == "new desc"
+
+
+def test_publish_calls_upsert_for_all_collected_files(tmp_path):
+    agent_id = "my-agent"
+    agent_dir = _setup_agent_dir(tmp_path, agent_id)
+    pub = _make_publisher()
+
+    with patch.object(pub, "_upsert_file") as mock_upsert, \
+         patch.object(pub, "_regenerate_marketplace"):
+        pub.publish(agent_id, agent_dir, version="5")
+
+    paths_uploaded = [call[0][0] for call in mock_upsert.call_args_list]
+    assert any("SKILL.md" in p for p in paths_uploaded)
+    assert any("plugin.json" in p for p in paths_uploaded)
+    assert not any(".mcp.json" in p for p in paths_uploaded)
+
+
+def test_publish_calls_regenerate_marketplace(tmp_path):
+    agent_id = "my-agent"
+    agent_dir = _setup_agent_dir(tmp_path, agent_id)
+    pub = _make_publisher()
+
+    with patch.object(pub, "_upsert_file"), \
+         patch.object(pub, "_regenerate_marketplace") as mock_regen:
+        pub.publish(agent_id, agent_dir, version="5")
+
+    mock_regen.assert_called_once_with("my-agent", "5", pub._extract_description(agent_dir))
