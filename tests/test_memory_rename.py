@@ -23,9 +23,11 @@ def test_consolidation_writes_digest_md(tmp_path, mocker):
     (tmp_path / "knowledge").mkdir()
 
     pipeline = ConsolidationPipeline(tmp_path, config, provider, soul="Be an expert.")
-    mocker.patch("core.consolidation.Registry")
+    mock_pw = mocker.patch("core.consolidation.PluginWriter")
+    mock_pw.return_value.write.return_value = (False, "1")
+    mock_gh = mocker.patch("core.consolidation.GitHubPublisher")
+    mock_gh.from_env.return_value = None
     mocker.patch("core.consolidation.AgentState")
-    mocker.patch("core.consolidation.PluginWriter")
     pipeline.run()
 
     assert (tmp_path / "digest.md").exists(), "digest.md must be written"

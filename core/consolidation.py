@@ -1,10 +1,9 @@
 import difflib
 import pathlib
 import logging
-from core.constants import DATA_DIR
 from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
-from core.registry import Registry
+from core.github_publisher import GitHubPublisher
 from core.skill_writer import SkillWriter, PluginWriter
 from core.skill_quality import SkillQualityStore
 from core.state import AgentState
@@ -102,7 +101,7 @@ class ConsolidationPipeline:
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
             pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
-            skill_changed = pw.write(plugin_output)
+            skill_changed, version = pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             job_status.log(
                 agent_id, task,
@@ -113,9 +112,14 @@ class ConsolidationPipeline:
                 self._run_skill_rollback_safely()
             self._run_structure_audit_safely()
 
-            reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md")
-            reg.save()
+            try:
+                publisher = GitHubPublisher.from_env()
+                if publisher:
+                    job_status.log(agent_id, task, "Publishing to GitHub marketplace…")
+                    publisher.publish(agent_id, self._dir, version)
+                    job_status.log(agent_id, task, "GitHub marketplace updated")
+            except Exception as e:
+                logger.warning("[%s] GitHub publish failed (non-fatal): %s", agent_id, e)
 
             self._update_index(knowledge_files)
 
@@ -207,14 +211,19 @@ class ConsolidationPipeline:
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
             pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
-            pw.write(plugin_output)
+            _, version = pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             self._run_skill_eval_safely(primary_skill_content)
             self._run_structure_audit_safely()
 
-            reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md")
-            reg.save()
+            try:
+                publisher = GitHubPublisher.from_env()
+                if publisher:
+                    job_status.log(agent_id, task, "Publishing to GitHub marketplace…")
+                    publisher.publish(agent_id, self._dir, version)
+                    job_status.log(agent_id, task, "GitHub marketplace updated")
+            except Exception as e:
+                logger.warning("[%s] GitHub publish failed (non-fatal): %s", agent_id, e)
 
             self._update_index(knowledge_files)
 
