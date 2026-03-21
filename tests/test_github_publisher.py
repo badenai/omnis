@@ -44,3 +44,93 @@ def test_extract_description_strips_underscore_italic(tmp_path):
     (tmp_path / "SOUL.md").write_text("_Focus on_ trading.\n")
     pub = _make_publisher()
     assert pub._extract_description(tmp_path) == "Focus on trading."
+
+
+import base64
+import json
+from unittest.mock import MagicMock, patch
+
+
+def _setup_agent_dir(tmp_path, agent_id):
+    """Create a minimal agent directory for testing."""
+    agent_dir = tmp_path / agent_id
+    agent_dir.mkdir()
+    (agent_dir / "SOUL.md").write_text("# My Agent\nFocus here.\n")
+    (agent_dir / "digest.md").write_text("# Digest")   # ← agent_dir root, not references/
+    skills = agent_dir / "skills" / "main-topic"
+    skills.mkdir(parents=True)
+    (skills / "SKILL.md").write_text("# Skill")
+    agents = agent_dir / "agents"
+    agents.mkdir()
+    (agents / f"{agent_id}.md").write_text("# Agent def")
+    hooks = agent_dir / "hooks"
+    hooks.mkdir()
+    (hooks / "hooks.json").write_text('{"SessionStart":[]}')
+    (hooks / "inject-digest.js").write_text("// js")
+    return agent_dir
+
+
+def test_collect_files_includes_all_required_paths(tmp_path):
+    agent_id = "my-agent"
+    agent_dir = _setup_agent_dir(tmp_path, agent_id)
+    pub = _make_publisher()
+    files = pub._collect_files(agent_id, agent_dir)
+    assert f"agents/{agent_id}/skills/main-topic/SKILL.md" in files
+    assert f"agents/{agent_id}/agents/{agent_id}.md" in files
+    assert f"agents/{agent_id}/references/digest.md" in files
+    assert f"agents/{agent_id}/hooks/hooks.json" in files
+    assert f"agents/{agent_id}/hooks/inject-digest.js" in files
+    assert f"agents/{agent_id}/plugin.json" in files
+
+
+def test_collect_files_excludes_mcp_json(tmp_path):
+    agent_id = "my-agent"
+    agent_dir = _setup_agent_dir(tmp_path, agent_id)
+    (agent_dir / ".mcp.json").write_text("{}")
+    pub = _make_publisher()
+    files = pub._collect_files(agent_id, agent_dir)
+    assert not any(".mcp.json" in k for k in files)
+
+
+def test_build_plugin_json_has_no_mcp_field(tmp_path):
+    agent_id = "my-agent"
+    agent_dir = _setup_agent_dir(tmp_path, agent_id)
+    pub = _make_publisher()
+    raw = pub._build_plugin_json(agent_id, agent_dir)
+    data = json.loads(raw)
+    assert "mcp" not in data
+    assert data["name"] == f"omnis-{agent_id}"
+
+
+def test_upsert_file_creates_new_file(tmp_path):
+    """When file doesn't exist, PUT without SHA."""
+    pub = _make_publisher()
+    mock_response_get = MagicMock()
+    mock_response_get.status_code = 404
+    mock_response_put = MagicMock()
+    mock_response_put.raise_for_status = MagicMock()
+
+    with patch.object(pub._client, "get", return_value=mock_response_get), \
+         patch.object(pub._client, "put", return_value=mock_response_put) as mock_put:
+        pub._upsert_file("agents/x/SKILL.md", "content")
+
+    call_body = json.loads(mock_put.call_args[1]["content"])
+    assert "sha" not in call_body
+    assert base64.b64decode(call_body["content"]).decode() == "content"
+
+
+def test_upsert_file_updates_existing_file_with_sha(tmp_path):
+    """When file exists, PUT includes the current SHA."""
+    pub = _make_publisher()
+    mock_response_get = MagicMock()
+    mock_response_get.status_code = 200
+    mock_response_get.json.return_value = {"sha": "abc123"}
+    mock_response_put = MagicMock()
+    mock_response_put.raise_for_status = MagicMock()
+
+    with patch.object(pub._client, "get", return_value=mock_response_get), \
+         patch.object(pub._client, "put", return_value=mock_response_put) as mock_put:
+        pub._upsert_file("agents/x/SKILL.md", "new content")
+
+    call_body = json.loads(mock_put.call_args[1]["content"])
+    assert call_body["sha"] == "abc123"
