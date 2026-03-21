@@ -86,9 +86,9 @@ class GitHubPublisher:
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            # Strip leading/trailing markdown bold/italic markers (* and _)
-            cleaned = stripped.strip("*_")
             # Also strip markers that may be embedded at word boundaries (e.g. **word**)
+            import re
+            cleaned = stripped
             cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
             cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
             cleaned = re.sub(r"__(.*?)__", r"\1", cleaned)
