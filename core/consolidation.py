@@ -1,10 +1,9 @@
 import difflib
 import pathlib
 import logging
-from core.constants import DATA_DIR
 from core.inbox import InboxWriter
 from core.knowledge import KnowledgeWriter
-from core.registry import Registry
+from core.github_publisher import GitHubPublisher
 from core.skill_writer import SkillWriter, PluginWriter
 from core.skill_quality import SkillQualityStore
 from core.state import AgentState
@@ -89,20 +88,16 @@ class ConsolidationPipeline:
             learnings = read_learnings(self._dir)
             if learnings:
                 job_status.log(agent_id, task, "Injecting regression learnings into skill generation…")
-            _skills_dir = (
-                pathlib.Path.home() / ".claude" / "plugins" / "cache"
-                / APP_NAME / self._config.agent_id / "1.0.0" / "skills"
-            )
-            existing_clusters = (
-                [d.name for d in _skills_dir.iterdir() if d.is_dir()]
-                if _skills_dir.exists() else []
-            )
+            existing_clusters = [
+                d.name for d in (self._dir / "skills").iterdir()
+                if d.is_dir()
+            ] if (self._dir / "skills").exists() else []
             plugin_output = self._provider.generate_plugin_skills(
                 digest, self._soul, self._config.agent_id,
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
             pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
-            skill_changed = pw.write(plugin_output)
+            skill_changed, version = pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             job_status.log(
                 agent_id, task,
@@ -113,9 +108,14 @@ class ConsolidationPipeline:
                 self._run_skill_rollback_safely()
             self._run_structure_audit_safely()
 
-            reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md")
-            reg.save()
+            try:
+                publisher = GitHubPublisher.from_env()
+                if publisher:
+                    job_status.log(agent_id, task, "Publishing to GitHub marketplace…")
+                    publisher.publish(agent_id, self._dir, version)
+                    job_status.log(agent_id, task, "GitHub marketplace updated")
+            except Exception as e:
+                logger.warning("[%s] GitHub publish failed (non-fatal): %s", agent_id, e)
 
             self._update_index(knowledge_files)
 
@@ -207,14 +207,19 @@ class ConsolidationPipeline:
                 learnings=learnings, existing_clusters=existing_clusters or None,
             )
             pw = PluginWriter(self._dir, version_override=self._config.plugin_version)
-            pw.write(plugin_output)
+            _, version = pw.write(plugin_output)
             primary_skill_content = plugin_output.skills[0].content if plugin_output.skills else ""
             self._run_skill_eval_safely(primary_skill_content)
             self._run_structure_audit_safely()
 
-            reg = Registry(DATA_DIR / "registry.json")
-            reg.register(self._config.agent_id, self._dir / "SKILL.md")
-            reg.save()
+            try:
+                publisher = GitHubPublisher.from_env()
+                if publisher:
+                    job_status.log(agent_id, task, "Publishing to GitHub marketplace…")
+                    publisher.publish(agent_id, self._dir, version)
+                    job_status.log(agent_id, task, "GitHub marketplace updated")
+            except Exception as e:
+                logger.warning("[%s] GitHub publish failed (non-fatal): %s", agent_id, e)
 
             self._update_index(knowledge_files)
 
@@ -392,20 +397,22 @@ class ConsolidationPipeline:
 
             job_status.update_step(agent_id, task, f"Soul autopilot: testing {len(individual)} suggestion(s) one by one…")
 
+            # Compute baseline answers once — reused across all suggestion evaluations
+            job_status.log(agent_id, task, "Soul autopilot: computing shared baseline answers…")
+            bare_answers = self._provider.compute_bare_answers(eval_cfg.prompts)
+
             for i, suggestion in enumerate(individual):
                 label = f"[{i + 1}/{len(individual)}]"
-                job_status.log(agent_id, task, f"Soul autopilot {label}: integrating suggestion…")
+                job_status.log(agent_id, task, f"Soul autopilot {label}: integrating + generating SKILL.md…")
 
-                candidate_soul = self._provider.integrate_soul_suggestions(current_soul, [suggestion])
-
-                job_status.log(agent_id, task, f"Soul autopilot {label}: generating candidate SKILL.md…")
-                candidate_skill = self._provider.generate_skill(
-                    digest, candidate_soul, agent_id, learnings=learnings
+                candidate_soul, candidate_skill = self._provider.integrate_and_generate_skill(
+                    current_soul, suggestion, digest, agent_id, learnings=learnings
                 )
 
                 job_status.log(agent_id, task, f"Soul autopilot {label}: evaluating…")
                 candidate_result = self._provider.evaluate_skill(
-                    candidate_skill, eval_cfg.prompts, candidate_soul
+                    candidate_skill, eval_cfg.prompts, candidate_soul,
+                    bare_answers=bare_answers,
                 )
                 candidate_score = candidate_result.score
 

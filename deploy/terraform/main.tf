@@ -129,7 +129,10 @@ resource "null_resource" "omnis_bootstrap" {
 
   triggers = {
     script_hash    = sha256(templatefile("${path.module}/scripts/omnis-bootstrap.sh.tpl", {
-      gemini_api_key = var.gemini_api_key
+      gemini_api_key            = var.gemini_api_key
+      github_token              = var.github_token
+      github_marketplace_repo   = var.github_marketplace_repo
+      github_marketplace_branch = var.github_marketplace_branch
     }))
     container_id   = proxmox_virtual_environment_container.omnis.id
   }
@@ -143,7 +146,10 @@ resource "null_resource" "omnis_bootstrap" {
 
   provisioner "file" {
     content = templatefile("${path.module}/scripts/omnis-bootstrap.sh.tpl", {
-      gemini_api_key = var.gemini_api_key
+      gemini_api_key            = var.gemini_api_key
+      github_token              = var.github_token
+      github_marketplace_repo   = var.github_marketplace_repo
+      github_marketplace_branch = var.github_marketplace_branch
     })
     destination = "/tmp/omnis-bootstrap.sh"
   }

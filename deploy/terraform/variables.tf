@@ -75,3 +75,22 @@ variable "caddy_users" {
   description = "Map of username to Caddy bcrypt hash. Generate with: caddy hash-password"
   default     = {}
 }
+
+variable "github_token" {
+  type        = string
+  sensitive   = true
+  description = "GitHub PAT with Contents: Read and write on the marketplace repo. Leave empty to disable publishing."
+  default     = ""
+}
+
+variable "github_marketplace_repo" {
+  type        = string
+  description = "GitHub repo for plugin marketplace, e.g. owner/omnis-plugins. Leave empty to disable publishing."
+  default     = ""
+}
+
+variable "github_marketplace_branch" {
+  type        = string
+  description = "Branch to publish to in the marketplace repo."
+  default     = "main"
+}

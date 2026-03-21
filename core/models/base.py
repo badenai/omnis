@@ -28,10 +28,18 @@ class KnowledgeProvider(Protocol):
     ) -> ConsolidationResult: ...
 
     def evaluate_skill(
-        self, skill_content: str, test_prompts: list[str], soul: str
+        self, skill_content: str, test_prompts: list[str], soul: str,
+        bare_answers: list[str] | None = None,
     ) -> "SkillEvalResult": ...
 
+    def compute_bare_answers(self, test_prompts: list[str]) -> list[str]: ...
+
     def integrate_soul_suggestions(self, soul: str, suggestions: list[str]) -> str: ...
+
+    def integrate_and_generate_skill(
+        self, soul: str, suggestion: str, digest: str, agent_id: str,
+        learnings: str | None = None,
+    ) -> tuple[str, str]: ...
 
     def stream_query(
         self,

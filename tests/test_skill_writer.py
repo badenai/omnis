@@ -4,8 +4,6 @@ from unittest.mock import patch
 from core.skill_writer import SkillWriter
 from core.registry import Registry
 
-PLUGIN_VERSION = "1.0.0"
-
 
 def test_write_skill_creates_file_in_agent_dir(tmp_path):
     agent_dir = tmp_path / "agents" / "trading"
@@ -16,78 +14,6 @@ def test_write_skill_creates_file_in_agent_dir(tmp_path):
     skill_file = agent_dir / "SKILL.md"
     assert skill_file.exists()
     assert "Trading Knowledge" in skill_file.read_text()
-
-
-def test_write_skill_copies_to_correct_claude_skills_path(tmp_path):
-    """Skill must go in skills/{agent_id}/SKILL.md under the versioned plugin installPath."""
-    agent_dir = tmp_path / "agents" / "trading"
-    agent_dir.mkdir(parents=True)
-    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
-        sw = SkillWriter(agent_dir)
-        sw.write("# Skill Content", agent_id="trading")
-    expected = (
-        tmp_path / ".claude" / "plugins" / "cache"
-        / "omnis" / "omnis" / PLUGIN_VERSION
-        / "skills" / "trading" / "SKILL.md"
-    )
-    assert expected.exists(), f"Expected skill at {expected}"
-    assert "Skill Content" in expected.read_text()
-
-
-def test_write_skill_registers_plugin_in_installed_plugins(tmp_path):
-    """First write must create the omnis@omnis entry in installed_plugins.json."""
-    agent_dir = tmp_path / "agents" / "trading"
-    agent_dir.mkdir(parents=True)
-    plugins_file = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
-    plugins_file.parent.mkdir(parents=True, exist_ok=True)
-    plugins_file.write_text(json.dumps({"version": 2, "plugins": {}}), encoding="utf-8")
-
-    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
-        sw = SkillWriter(agent_dir)
-        sw.write("# Content", agent_id="trading")
-
-    data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    assert "omnis@omnis" in data["plugins"]
-    entry = data["plugins"]["omnis@omnis"][0]
-    assert entry["scope"] == "user"
-    assert entry["version"] == PLUGIN_VERSION
-    expected_install_path = str(
-        tmp_path / ".claude" / "plugins" / "cache" / "omnis" / "omnis" / PLUGIN_VERSION
-    )
-    assert entry["installPath"] == expected_install_path
-
-
-def test_write_skill_updates_last_updated_on_refresh(tmp_path):
-    """Re-writing a skill must bump lastUpdated without duplicating the plugins entry."""
-    agent_dir = tmp_path / "agents" / "trading"
-    agent_dir.mkdir(parents=True)
-    plugins_file = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
-    plugins_file.parent.mkdir(parents=True, exist_ok=True)
-    plugins_file.write_text(json.dumps({"version": 2, "plugins": {}}), encoding="utf-8")
-
-    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
-        sw = SkillWriter(agent_dir)
-        sw.write("# v1", agent_id="trading")
-        sw.write("# v2", agent_id="trading")
-
-    data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    entries = data["plugins"]["omnis@omnis"]
-    assert len(entries) == 1, "Should not create duplicate entries"
-
-
-def test_write_skill_creates_installed_plugins_if_missing(tmp_path):
-    """If installed_plugins.json doesn't exist yet, create it from scratch."""
-    agent_dir = tmp_path / "agents" / "trading"
-    agent_dir.mkdir(parents=True)
-
-    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
-        sw = SkillWriter(agent_dir)
-        sw.write("# Content", agent_id="trading")
-
-    plugins_file = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
-    assert plugins_file.exists()
-    data = json.loads(plugins_file.read_text(encoding="utf-8"))
-    assert "omnis@omnis" in data["plugins"]
 
 
 def test_registry_register_and_save(tmp_path):
@@ -102,3 +28,86 @@ def test_registry_register_and_save(tmp_path):
 def test_registry_load_missing_returns_empty(tmp_path):
     reg = Registry(tmp_path / "registry.json")
     assert reg.agents == {}
+
+
+def test_plugin_writer_returns_tuple_with_version(tmp_path):
+    """write() must return (skill_changed: bool, version: str)."""
+    from core.skill_writer import PluginWriter
+    from core.models.types import PluginOutput, SkillSpec
+    agent_dir = tmp_path / "my-agent"
+    agent_dir.mkdir()
+    (agent_dir / "SOUL.md").write_text("# Agent\nFocus.")
+    output = PluginOutput(agent_id="my-agent", skills=[
+        SkillSpec(name="main", description="Main skill", file_pattern=None, bash_pattern=None, content="# Skill content")
+    ], session_hook_digest="")
+    pw = PluginWriter(agent_dir)
+    result = pw.write(output)
+    assert isinstance(result, tuple) and len(result) == 2
+    changed, version = result
+    assert isinstance(changed, bool)
+    assert isinstance(version, str)
+
+
+def test_plugin_writer_does_not_write_to_claude_cache(tmp_path):
+    """After cleanup, PluginWriter must NOT touch ~/.claude/plugins/cache/."""
+    from core.skill_writer import PluginWriter
+    from core.models.types import PluginOutput, SkillSpec
+    agent_dir = tmp_path / "my-agent"
+    agent_dir.mkdir()
+    (agent_dir / "SOUL.md").write_text("# Agent\nFocus.")
+    output = PluginOutput(agent_id="my-agent", skills=[
+        SkillSpec(name="main", description="Main skill", file_pattern=None, bash_pattern=None, content="# Skill content")
+    ], session_hook_digest="")
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        pw = PluginWriter(agent_dir)
+        pw.write(output)
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    assert not cache.exists(), "PluginWriter must not write to claude plugin cache"
+
+
+def test_plugin_writer_does_not_create_installed_plugins(tmp_path):
+    """PluginWriter must not touch installed_plugins.json."""
+    from core.skill_writer import PluginWriter
+    from core.models.types import PluginOutput, SkillSpec
+    agent_dir = tmp_path / "my-agent"
+    agent_dir.mkdir()
+    (agent_dir / "SOUL.md").write_text("# Agent\nFocus.")
+    output = PluginOutput(agent_id="my-agent", skills=[
+        SkillSpec(name="main", description="Main skill", file_pattern=None, bash_pattern=None, content="# Skill content")
+    ], session_hook_digest="")
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        pw = PluginWriter(agent_dir)
+        pw.write(output)
+    installed = tmp_path / ".claude" / "plugins" / "installed_plugins.json"
+    assert not installed.exists()
+
+
+def test_skill_writer_does_not_write_to_claude_cache(tmp_path):
+    from core.skill_writer import SkillWriter
+    agent_dir = tmp_path / "agents" / "trading"
+    agent_dir.mkdir(parents=True)
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        sw = SkillWriter(agent_dir)
+        sw.write("# Skill", agent_id="trading")
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    assert not cache.exists()
+
+
+def test_skill_writer_revert_does_not_write_to_claude_cache(tmp_path):
+    from core.skill_writer import SkillWriter
+    agent_dir = tmp_path / "agents" / "trading"
+    agent_dir.mkdir(parents=True)
+    # Set up a previous skill and a skills dir (needed for revert)
+    (agent_dir / "SKILL.md").write_text("# Current")
+    (agent_dir / "SKILL.previous.md").write_text("# Previous")
+    skills_dir = agent_dir / "skills" / "main"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("# Cluster skill")
+    (agent_dir / "plugin_version.txt").write_text("3")
+
+    with patch("core.skill_writer.pathlib.Path.home", return_value=tmp_path):
+        sw = SkillWriter(agent_dir)
+        sw.revert_to_previous("trading")
+
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    assert not cache.exists()

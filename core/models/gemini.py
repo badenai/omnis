@@ -680,6 +680,104 @@ class GeminiProvider:
         )
         return self._generate(contents, model=self._consolidation_model_name)
 
+    def compute_bare_answers(self, test_prompts: list[str]) -> list[str]:
+        """Generate one baseline (no-skill) answer per prompt. Used to share across evaluate_skill calls."""
+        return [
+            self._generate(p, model=self._consolidation_model_name)
+            for p in test_prompts
+        ]
+
+    def integrate_and_generate_skill(
+        self, soul: str, suggestion: str, digest: str, agent_id: str,
+        learnings: str | None = None,
+    ) -> tuple[str, str]:
+        """Integrate one suggestion into the soul AND generate a SKILL.md in a single LLM call.
+
+        Returns (revised_soul, skill_md).
+        """
+        skill_rules = (
+            f"You are writing a Claude Code SKILL.md file.\n"
+            f"This is NOT a knowledge summary. It is an ACTIVATION PROTOCOL —\n"
+            f"a behavioral instruction set that changes how Claude reasons and acts\n"
+            f"when implementing code in this domain.\n\n"
+            f"Required sections:\n\n"
+            f"1. Raw YAML frontmatter at the very top of the file — NOT in a code fence:\n"
+            f"   ---\n"
+            f"   name: {agent_id}\n"
+            f"   description: <'Use when [specific trigger conditions only]' — under 500 chars,\n"
+            f"                 no workflow summary, just the situations that activate this skill,\n"
+            f"                 third-person, never starts with 'I' or 'You'>\n"
+            f"   ---\n\n"
+            f"2. ## The Iron Law\n"
+            f"   The single non-negotiable constraint, in a fenced code block for emphasis.\n\n"
+            f"3. ## Behavioral Rules\n"
+            f"   Specific conditional rules: 'Before writing X, verify Y' / 'When Z happens, do W'.\n"
+            f"   Prefer explaining WHY over blanket MUST/NEVER/ALWAYS in ALL CAPS.\n"
+            f"   Limit all-caps emphasis to 4 or fewer instances total.\n\n"
+            f"4. ## Red Flags\n"
+            f"   A table of domain-specific rationalizations someone would actually think,\n"
+            f"   paired with why each is wrong. Format: | Rationalization | Why It's Wrong |\n\n"
+            f"5. ## Quick Reference\n"
+            f"   Compact table: Allowed vs. Forbidden (or equivalent checklist).\n\n"
+            f"Writing rules:\n"
+            f"- Extract BEHAVIORAL CONSTRAINTS from the knowledge — not the knowledge itself\n"
+            f"- Every sentence must be imperative or conditional, never descriptive\n"
+            f"- Red flags must be realistic excuses, not generic ones\n"
+            f"- Concise and scannable: Claude reads this before acting, not for research\n"
+            f"- Trigger conditions belong in the description field only — do NOT add a 'When to Use' section\n"
+            f"- Do NOT add 'Announce at start' lines, metadata timestamps, or introductory prose\n\n"
+        )
+        if learnings:
+            skill_rules += (
+                f"## Anti-Patterns to Avoid (learned from past regressions)\n"
+                f"{learnings}\n\n"
+            )
+
+        contents = (
+            f"TASK: In a single response, do two things:\n"
+            f"1. Revise the SOUL.md by integrating the improvement suggestion.\n"
+            f"2. Generate a SKILL.md for this agent using the REVISED soul and the knowledge digest.\n\n"
+            f"=== SOUL INTEGRATION RULES ===\n"
+            f"- Preserve the existing soul's voice, structure, and core directives\n"
+            f"- Integrate the suggestion naturally into the appropriate section — do not append at end\n"
+            f"- Only change what the suggestion specifically recommends; leave everything else intact\n"
+            f"- Do not add unnecessary new sections or restructure unnecessarily\n\n"
+            f"=== SKILL GENERATION RULES ===\n"
+            f"{skill_rules}"
+            f"=== OUTPUT FORMAT (use these exact delimiters) ===\n"
+            f"---REVISED_SOUL_START---\n"
+            f"<complete revised SOUL.md text>\n"
+            f"---REVISED_SOUL_END---\n"
+            f"---SKILL_MD_START---\n"
+            f"<complete SKILL.md text with frontmatter>\n"
+            f"---SKILL_MD_END---\n\n"
+            f"AGENT ID: {agent_id}\n\n"
+            f"CURRENT SOUL:\n{soul}\n\n"
+            f"IMPROVEMENT TO INTEGRATE:\n{suggestion}\n\n"
+            f"KNOWLEDGE DIGEST (extract behavioral rules — do not summarize it):\n"
+            f"{digest}"
+        )
+        raw = self._generate(contents, model=self._consolidation_model_name)
+
+        # Parse delimited output
+        def _extract(text: str, start: str, end: str) -> str:
+            _, found, after = text.partition(start)
+            if not found:
+                return ""
+            content, _, _ = after.partition(end)
+            return content.strip()
+
+        revised_soul = _extract(raw, "---REVISED_SOUL_START---", "---REVISED_SOUL_END---")
+        skill_md = _extract(raw, "---SKILL_MD_START---", "---SKILL_MD_END---")
+
+        if not revised_soul:
+            logger.warning("integrate_and_generate_skill: REVISED_SOUL block missing; falling back to original soul")
+            revised_soul = soul
+        if not skill_md:
+            raise ValueError("integrate_and_generate_skill: SKILL_MD block missing in model response")
+
+        return revised_soul, skill_md
+
     # -------------------------------------------------------------------------
     # Delimited block parsers (used by grounded/search-enabled methods)
     # -------------------------------------------------------------------------
@@ -826,7 +924,8 @@ class GeminiProvider:
         )
 
     def evaluate_skill(
-        self, skill_content: str, test_prompts: list[str], soul: str
+        self, skill_content: str, test_prompts: list[str], soul: str,
+        bare_answers: list[str] | None = None,
     ) -> SkillEvalResult:
         """Blind A/B comparison with SOUL-aware rubric.
 
@@ -838,6 +937,8 @@ class GeminiProvider:
 
         Overall score = mean(skill_scores) normalised by mean(bare_scores),
         capped at 1.0, so it represents relative improvement over baseline.
+
+        bare_answers: pre-computed baseline answers (skips baseline LLM calls if supplied).
         """
         import hashlib
         import random
@@ -848,14 +949,15 @@ class GeminiProvider:
         skill_truncated = skill_content[:8000]
         soul_focus = soul[:500]  # first 500 chars captures focus areas without overwhelming
 
-        # --- Step 1: Bare answers ---
-        if ctx:
-            job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} baseline queries…")
-        bare_answers = []
-        for i, prompt in enumerate(test_prompts):
+        # --- Step 1: Bare answers (skip if pre-computed) ---
+        if bare_answers is None:
             if ctx:
-                job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] baseline…")
-            bare_answers.append(self._generate(prompt, model=self._consolidation_model_name))
+                job_status.update_step(ctx[0], ctx[1], f"Skill eval: {len(test_prompts)} baseline queries…")
+            bare_answers = []
+            for i, prompt in enumerate(test_prompts):
+                if ctx:
+                    job_status.log(ctx[0], ctx[1], f"Skill eval [{i + 1}/{len(test_prompts)}] baseline…")
+                bare_answers.append(self._generate(prompt, model=self._consolidation_model_name))
 
         # --- Step 2: Skill-assisted answers ---
         if ctx:

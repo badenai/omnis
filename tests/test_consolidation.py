@@ -31,8 +31,10 @@ def test_consolidation_generates_digest_when_inbox_has_items(tmp_path, mocker):
     mock_provider.generate_digest.return_value = "# Digest\nContent."
     mock_provider.generate_plugin_skills.return_value.skills = []
 
-    with patch("core.consolidation.PluginWriter"), \
-         patch("core.consolidation.Registry"):
+    with patch("core.consolidation.PluginWriter") as mock_pw_cls, \
+         patch("core.consolidation.GitHubPublisher") as mock_gh_cls:
+        mock_pw_cls.return_value.write.return_value = (False, "1")
+        mock_gh_cls.from_env.return_value = None  # publisher disabled
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 
@@ -51,8 +53,10 @@ def test_consolidation_clears_inbox_after_run(tmp_path, mocker):
     mock_provider.generate_digest.return_value = "# Digest"
     mock_provider.generate_skill.return_value = "# Skill"
 
-    with patch("core.consolidation.PluginWriter"), \
-         patch("core.consolidation.Registry"):
+    with patch("core.consolidation.PluginWriter") as mock_pw_cls, \
+         patch("core.consolidation.GitHubPublisher") as mock_gh_cls:
+        mock_pw_cls.return_value.write.return_value = (False, "1")
+        mock_gh_cls.from_env.return_value = None  # publisher disabled
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run()
 
@@ -81,8 +85,10 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     mock_provider.generate_digest.return_value = "# Digest\nContent."
     mock_provider.generate_plugin_skills.return_value.skills = []
 
-    with patch("core.consolidation.PluginWriter"), \
-         patch("core.consolidation.Registry"):
+    with patch("core.consolidation.PluginWriter") as mock_pw_cls, \
+         patch("core.consolidation.GitHubPublisher") as mock_gh_cls:
+        mock_pw_cls.return_value.write.return_value = (False, "1")
+        mock_gh_cls.from_env.return_value = None  # publisher disabled
         pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
         pipeline.run_reevaluation()
 
@@ -94,3 +100,44 @@ def test_reevaluation_scores_files_and_generates_outputs(tmp_path):
     mock_provider.reevaluate_knowledge.assert_called_once()
     mock_provider.generate_digest.assert_called_once()
     mock_provider.generate_plugin_skills.assert_called_once()
+
+
+def test_consolidation_calls_github_publisher_when_configured(tmp_path):
+    (tmp_path / "INBOX.md").write_text("## entry\ncontent here")
+    (tmp_path / "knowledge").mkdir()
+
+    mock_provider = MagicMock()
+    mock_provider.consolidate.return_value = ConsolidationResult(updated_files=[], created_files=[])
+    mock_provider.generate_digest.return_value = "# Digest"
+    mock_provider.generate_plugin_skills.return_value.skills = []
+
+    mock_publisher = MagicMock()
+
+    with patch("core.consolidation.PluginWriter") as mock_pw_cls, \
+         patch("core.consolidation.GitHubPublisher") as mock_gh_cls:
+        mock_pw_cls.return_value.write.return_value = (False, "1")
+        mock_gh_cls.from_env.return_value = mock_publisher
+
+        pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
+        pipeline.run()
+
+    mock_publisher.publish.assert_called_once()
+
+
+def test_consolidation_skips_publisher_when_not_configured(tmp_path):
+    (tmp_path / "INBOX.md").write_text("## entry\ncontent")
+    (tmp_path / "knowledge").mkdir()
+
+    mock_provider = MagicMock()
+    mock_provider.consolidate.return_value = ConsolidationResult(updated_files=[], created_files=[])
+    mock_provider.generate_digest.return_value = "# Digest"
+    mock_provider.generate_plugin_skills.return_value.skills = []
+
+    with patch("core.consolidation.PluginWriter") as mock_pw_cls, \
+         patch("core.consolidation.GitHubPublisher") as mock_gh_cls:
+        mock_pw_cls.return_value.write.return_value = (False, "1")
+        mock_gh_cls.from_env.return_value = None  # not configured
+
+        pipeline = ConsolidationPipeline(tmp_path, _make_config(), mock_provider, soul="soul")
+        pipeline.run()
+        # Just must not raise

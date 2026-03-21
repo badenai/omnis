@@ -1,17 +1,12 @@
 import difflib
-import json
 import pathlib
 import re
 import shutil
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from core.constants import APP_NAME, PLUGIN_VERSION
 
 if TYPE_CHECKING:
     from core.models.types import PluginOutput
-
-_PLUGIN_KEY = f"{APP_NAME}@{APP_NAME}"
 
 
 def _sanitize_structure(content: str) -> str:
@@ -67,25 +62,6 @@ class SkillWriter:
 
         local.write_text(skill_content, encoding="utf-8")
 
-        # Global copy in the Claude Code plugin cache
-        install_path = (
-            pathlib.Path.home()
-            / ".claude" / "plugins" / "cache"
-            / APP_NAME / APP_NAME / PLUGIN_VERSION
-        )
-        skill_dir = install_path / "skills" / agent_id
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
-
-        # Bundle reference files for progressive disclosure
-        refs_dir = skill_dir / "references"
-        refs_dir.mkdir(exist_ok=True)
-        digest_src = self._agent_dir / "digest.md"
-        if digest_src.exists():
-            shutil.copy2(digest_src, refs_dir / "digest.md")
-
-        self._register_plugin(install_path)
-
         # Compute diff
         if previous_content is None:
             changed = True  # first run, nothing to diff
@@ -108,8 +84,7 @@ class SkillWriter:
         """Revert SKILL.md to its previous version.
 
         Saves the current (rejected) skill to SKILL.rejected.md for analysis,
-        then restores SKILL.previous.md as the active skill in both the agent
-        directory and the plugin cache.
+        then restores SKILL.previous.md as the active skill in the agent directory.
 
         Returns True on success, False if SKILL.previous.md does not exist.
         """
@@ -126,79 +101,37 @@ class SkillWriter:
         previous_content = previous_path.read_text("utf-8")
         current_path.write_text(previous_content, "utf-8")
 
-        # Mirror to agent_dir/skills/{primary} and plugin cache.
+        # Mirror to agent_dir/skills/{primary}.
         skills_dir = self._agent_dir / "skills"
         cluster_dirs = sorted(d for d in skills_dir.iterdir() if d.is_dir()) if skills_dir.exists() else []
         if cluster_dirs:
             primary_agent_path = cluster_dirs[0] / "SKILL.md"
             primary_agent_path.parent.mkdir(parents=True, exist_ok=True)
             primary_agent_path.write_text(previous_content, "utf-8")
-            version_file = self._agent_dir / "plugin_version.txt"
-            if version_file.exists():
-                version = version_file.read_text("utf-8").strip()
-                install_path = (
-                    pathlib.Path.home() / ".claude" / "plugins" / "cache"
-                    / APP_NAME / agent_id / version
-                )
-                plugin_cache_path = install_path / "skills" / cluster_dirs[0].name / "SKILL.md"
-                if plugin_cache_path.parent.exists():
-                    plugin_cache_path.write_text(previous_content, "utf-8")
 
         return True
 
-    def _register_plugin(self, install_path: pathlib.Path) -> None:
-        plugins_file = (
-            pathlib.Path.home() / ".claude" / "plugins" / "installed_plugins.json"
-        )
-        plugins_file.parent.mkdir(parents=True, exist_ok=True)
-
-        if plugins_file.exists():
-            data = json.loads(plugins_file.read_text(encoding="utf-8"))
-        else:
-            data = {"version": 2, "plugins": {}}
-
-        now = datetime.now(timezone.utc).isoformat()
-        install_path_str = str(install_path)
-
-        if _PLUGIN_KEY in data["plugins"]:
-            data["plugins"][_PLUGIN_KEY][0]["lastUpdated"] = now
-        else:
-            data["plugins"][_PLUGIN_KEY] = [
-                {
-                    "scope": "user",
-                    "installPath": install_path_str,
-                    "version": PLUGIN_VERSION,
-                    "installedAt": now,
-                    "lastUpdated": now,
-                }
-            ]
-
-        plugins_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
 
 class PluginWriter:
-    """Writes a complete per-agent Claude Code plugin with topic-clustered skills.
+    """Writes per-agent plugin files to the agent directory (source of truth only).
 
-    Install path: ~/.claude/plugins/cache/{APP_NAME}/{agent_id}/{version}/
-    ├── .claude-plugin/plugin.json
-    ├── skills/{cluster}/SKILL.md
-    ├── hooks/hooks.json + inject-digest.js
-    ├── .mcp.json
-    └── references/digest.md
+    agent_dir/
+    ├── skills/{cluster}/SKILL.md   — topic-clustered skills
+    ├── agents/{agent_id}.md        — agent definition from SOUL.md
+    ├── SKILL.md                    — backward-compat primary skill copy
+    └── plugin_version.txt          — auto-incremented version counter
 
-    Also writes a backward-compat primary skill to agent_dir/SKILL.md and records
-    the plugin cache path in agent_dir/primary_skill_path.txt.
+    No writes to ~/.claude/plugins/cache/ — GitHub publishing handles distribution.
     """
 
     def __init__(self, agent_dir: pathlib.Path, version_override: str | None = None):
         self._agent_dir = agent_dir
         self._version_override = version_override
 
-    def write(self, plugin_output: "PluginOutput") -> bool:
-        """Write full plugin structure. Returns True if primary skill changed.
+    def write(self, plugin_output: "PluginOutput") -> tuple[bool, str]:
+        """Write full plugin structure. Returns (skill_changed, version).
 
         Source of truth: agent_dir/skills/{cluster}/SKILL.md
-        Plugin cache:    ~/.claude/plugins/cache/omnis/{agent_id}/{version}/  (mirror only)
         """
         agent_id = plugin_output.agent_id
 
@@ -213,13 +146,7 @@ class PluginWriter:
             except ValueError:
                 version = "1"
 
-        install_path = (
-            pathlib.Path.home()
-            / ".claude" / "plugins" / "cache"
-            / APP_NAME / agent_id / version
-        )
-
-        # --- Cluster skills: write to agent_dir/skills/ first (source of truth) ---
+        # --- Cluster skills: write to agent_dir/skills/ (source of truth) ---
         agent_skills_dir = self._agent_dir / "skills"
         if agent_skills_dir.exists():
             shutil.rmtree(agent_skills_dir)
@@ -230,88 +157,21 @@ class PluginWriter:
             content = _sanitize_structure(content)
             (cluster_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
-        # --- Mirror skills to plugin cache ---
-        plugin_skills_dir = install_path / "skills"
-        if plugin_skills_dir.exists():
-            shutil.rmtree(plugin_skills_dir)
-        shutil.copytree(agent_skills_dir, plugin_skills_dir)
-
-        # --- Plugin manifest ---
-        manifest_dir = install_path / ".claude-plugin"
-        manifest_dir.mkdir(parents=True, exist_ok=True)
-        plugin_json = {
-            "name": f"omnis-{agent_id}",
-            "version": version,
-            "description": f"Knowledge agent for {agent_id}",
-            "author": "Omnis",
-            "hooks": "./hooks/hooks.json",
-            "mcp": "./.mcp.json",
-        }
-        (manifest_dir / "plugin.json").write_text(
-            json.dumps(plugin_json, indent=2), encoding="utf-8"
-        )
-
-        # --- Hooks ---
-        hooks_dir = install_path / "hooks"
-        hooks_dir.mkdir(exist_ok=True)
-        hooks_json = {
-            "SessionStart": [{
-                "matcher": "startup|resume",
-                "hooks": [{
-                    "type": "command",
-                    "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-digest.js\"",
-                }],
-            }]
-        }
-        (hooks_dir / "hooks.json").write_text(
-            json.dumps(hooks_json, indent=2), encoding="utf-8"
-        )
-        inject_js = (
-            "const fs = require('fs'), path = require('path');\n"
-            "const f = path.join(process.env.CLAUDE_PLUGIN_ROOT, 'references', 'digest.md');\n"
-            "if (fs.existsSync(f)) "
-            "process.stdout.write(fs.readFileSync(f, 'utf8').split('\\n').slice(0, 80).join('\\n'));\n"
-        )
-        (hooks_dir / "inject-digest.js").write_text(inject_js, encoding="utf-8")
-
-        # --- MCP config ---
-        mcp_json = {
-            "mcpServers": {
-                f"omnis-{agent_id}": {"type": "sse", "url": "http://localhost:8420/mcp"},
-            }
-        }
-        (install_path / ".mcp.json").write_text(
-            json.dumps(mcp_json, indent=2), encoding="utf-8"
-        )
-
-        # --- References (digest bundle in plugin cache) ---
-        refs_dir = install_path / "references"
-        refs_dir.mkdir(exist_ok=True)
-        digest_src = self._agent_dir / "digest.md"
-        if digest_src.exists():
-            shutil.copy2(digest_src, refs_dir / "digest.md")
-
-
         # --- Agent definition ---
-        self._write_agent_file(agent_id, install_path)
+        self._write_agent_file(agent_id)
 
         # --- Backward compat: write agent_dir/SKILL.md (primary skill copy) ---
         changed = self._write_local_skill(plugin_output)
 
-        # --- Track current version and install path ---
+        # --- Track current version ---
         version_file.write_text(version, encoding="utf-8")
 
-        # --- Register plugin ---
-        plugin_key = f"{APP_NAME}@{agent_id}"
-        self._register_plugin(install_path, plugin_key)
+        return changed, version
 
-        return changed
-
-    def _write_agent_file(self, agent_id: str, install_path: pathlib.Path) -> None:
+    def _write_agent_file(self, agent_id: str) -> None:
         """Generate and write a plugin agent definition from the agent's SOUL.md.
 
         Source of truth: agent_dir/agents/{agent_id}.md
-        Plugin cache:    install_path/agents/{agent_id}.md  (mirror)
         """
         soul_path = self._agent_dir / "SOUL.md"
         soul = soul_path.read_text(encoding="utf-8").strip() if soul_path.exists() else ""
@@ -342,11 +202,6 @@ class PluginWriter:
         agents_dir = self._agent_dir / "agents"
         agents_dir.mkdir(exist_ok=True)
         (agents_dir / f"{agent_id}.md").write_text(content, encoding="utf-8")
-
-        # Mirror to plugin cache
-        plugin_agents_dir = install_path / "agents"
-        plugin_agents_dir.mkdir(exist_ok=True)
-        (plugin_agents_dir / f"{agent_id}.md").write_text(content, encoding="utf-8")
 
     def _write_local_skill(self, plugin_output: "PluginOutput") -> bool:
         """Write sanitized primary skill to agent_dir/SKILL.md. Returns True if changed."""
@@ -383,29 +238,3 @@ class PluginWriter:
         (self._agent_dir / "SKILL.diff").write_text("".join(diff), "utf-8")
         return True
 
-    def _register_plugin(self, install_path: pathlib.Path, plugin_key: str) -> None:
-        plugins_file = (
-            pathlib.Path.home() / ".claude" / "plugins" / "installed_plugins.json"
-        )
-        plugins_file.parent.mkdir(parents=True, exist_ok=True)
-
-        if plugins_file.exists():
-            data = json.loads(plugins_file.read_text(encoding="utf-8"))
-        else:
-            data = {"version": 2, "plugins": {}}
-
-        now = datetime.now(timezone.utc).isoformat()
-        install_path_str = str(install_path)
-
-        if plugin_key in data["plugins"]:
-            data["plugins"][plugin_key][0]["lastUpdated"] = now
-        else:
-            data["plugins"][plugin_key] = [{
-                "scope": "user",
-                "installPath": install_path_str,
-                "version": PLUGIN_VERSION,
-                "installedAt": now,
-                "lastUpdated": now,
-            }]
-
-        plugins_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
