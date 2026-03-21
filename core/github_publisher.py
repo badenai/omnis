@@ -129,7 +129,7 @@ class GitHubPublisher:
         if sha:
             body["sha"] = sha
 
-        put_resp = self._client.put(url, content=json.dumps(body))
+        put_resp = self._client.put(url, json=body)
         put_resp.raise_for_status()
 
     def _regenerate_marketplace(self, agent_id: str, version: str, description: str) -> None:

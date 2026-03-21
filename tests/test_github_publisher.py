@@ -114,7 +114,7 @@ def test_upsert_file_creates_new_file(tmp_path):
          patch.object(pub._client, "put", return_value=mock_response_put) as mock_put:
         pub._upsert_file("agents/x/SKILL.md", "content")
 
-    call_body = json.loads(mock_put.call_args[1]["content"])
+    call_body = mock_put.call_args[1]["json"]
     assert "sha" not in call_body
     assert base64.b64decode(call_body["content"]).decode() == "content"
 
@@ -132,5 +132,5 @@ def test_upsert_file_updates_existing_file_with_sha(tmp_path):
          patch.object(pub._client, "put", return_value=mock_response_put) as mock_put:
         pub._upsert_file("agents/x/SKILL.md", "new content")
 
-    call_body = json.loads(mock_put.call_args[1]["content"])
+    call_body = mock_put.call_args[1]["json"]
     assert call_body["sha"] == "abc123"
