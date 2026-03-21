@@ -27,9 +27,9 @@
 import base64
 import json
 import logging
+import os
 import pathlib
 import re
-from typing import Optional
 
 import httpx
 
@@ -51,9 +51,8 @@ class GitHubPublisher:
         )
 
     @classmethod
-    def from_env(cls) -> "Optional[GitHubPublisher]":
+    def from_env(cls) -> "GitHubPublisher | None":
         """Returns None if GITHUB_TOKEN or GITHUB_MARKETPLACE_REPO is absent."""
-        import os
         token = os.environ.get("GITHUB_TOKEN")
         repo = os.environ.get("GITHUB_MARKETPLACE_REPO")
         if not token or not repo:
@@ -87,7 +86,6 @@ class GitHubPublisher:
             if not stripped or stripped.startswith("#"):
                 continue
             # Also strip markers that may be embedded at word boundaries (e.g. **word**)
-            import re
             cleaned = stripped
             cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
             cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
