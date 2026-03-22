@@ -119,7 +119,7 @@ class GitHubPublisher:
             "name": f"omnis-{agent_id}",
             "version": version,
             "description": f"Knowledge agent for {agent_id}",
-            "author": "Omnis",
+            "author": {"name": "Omnis"},
             "hooks": "./hooks/hooks.json",
         }
         return json.dumps(manifest, indent=2)
